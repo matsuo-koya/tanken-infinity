@@ -211,6 +211,8 @@ export default function TankenInfinity() {
   };
   const voiceOnRef = useRef(true);
   const jaVoice = useRef(null);
+  const ttsUnlocked = useRef(false);
+  const speakSeq = useRef(0);
 
   function loadVoices() {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -218,12 +220,27 @@ export default function TankenInfinity() {
     jaVoice.current = vs.find(v => v.lang && v.lang.startsWith("ja")) || null;
   }
 
+  /* iOS解錠：最初のspeak()はタップ直下（await前）で呼ばないと以後すべて無視される。
+     無音の一言を先に流し込んで発話権を得ておく。 */
+  function unlockSpeech() {
+    if (ttsUnlocked.current) return;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    try {
+      loadVoices();
+      const u = new SpeechSynthesisUtterance("　");
+      u.lang = "ja-JP"; u.volume = 0; u.rate = 2;
+      window.speechSynthesis.speak(u);
+      ttsUnlocked.current = true;
+    } catch (e) { /* 非対応環境では黙って続行 */ }
+  }
+
   function speak(text) {
     if (!voiceOnRef.current) return;
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     if (!audio.current) return; // 解錠前は発話しない（iOSでTTSがオーディオセッションを先取りするのを防ぐ）
     try {
-      window.speechSynthesis.cancel();
+      const synth = window.speechSynthesis;
+      synth.cancel();
       let spoken = text;
       for (const [kj, yomi] of READINGS) spoken = spoken.split(kj).join(yomi);
       const u = new SpeechSynthesisUtterance(spoken);
@@ -239,7 +256,13 @@ export default function TankenInfinity() {
         try { Tone.getContext().rawContext.resume(); } catch (e) {}
       };
       u.onend = restore; u.onerror = restore;
-      window.speechSynthesis.speak(u);
+      // iOS対策：cancel()直後のspeak()は取りこぼされることがあるため一拍おく。
+      // また、勝手にpaused状態へ落ちることがあるのでresume()で起こしてから流す。
+      const seq = ++speakSeq.current;
+      setTimeout(() => {
+        if (seq !== speakSeq.current) return; // 次の語りに追い越されたら黙る
+        try { synth.resume(); synth.speak(u); } catch (e) {}
+      }, 60);
     } catch (e) { /* 読み上げ非対応環境では無音で継続 */ }
   }
 
@@ -433,6 +456,8 @@ export default function TankenInfinity() {
       const src = raw.createBufferSource();
       src.buffer = buf; src.connect(raw.destination); src.start(0);
     } catch (e) {}
+    // 初期画面から再始動した場合：音響機関は既に組み上がっているので作り直さない
+    if (audio.current) { Tone.Transport.start(); return; }
     const out = new Tone.Gain(0.85).toDestination();
     const filt = new Tone.Filter(9000, "lowpass").connect(out);
     const dist = new Tone.Distortion(0.5).connect(filt); dist.wet.value = 0;
@@ -1099,6 +1124,8 @@ export default function TankenInfinity() {
   /* ---------------- 起動・停止 ---------------- */
   const start = async () => {
     // --- iOS解錠：あらゆる発音（TTS含む）より先に、タップ直下で行う ---
+    // awaitより前＝ユーザー操作の文脈が生きているうちに読み上げを解錠しておく
+    unlockSpeech();
     try {
       await Tone.start();
       const raw = Tone.getContext().rawContext;
@@ -1129,15 +1156,36 @@ export default function TankenInfinity() {
       Tone.Transport.start();
       try { Tone.getContext().rawContext.resume(); } catch (e) {}
     }
+    // ウォッチドッグの基準時刻を今に揃える（停止中に古びた値のまま再開すると、
+    // Transportが先に予約した音より過去の時刻で発音してしまう）
+    lastStepAt.current = Date.now();
     setRunning(true); runningRef.current = true;
   };
   const pause = () => { Tone.Transport.pause(); setRunning(false); runningRef.current = false; try { window.speechSynthesis?.cancel(); } catch (e) {} render(); };
   const toggleVoice = () => {
     const next = !voiceOnRef.current;
     voiceOnRef.current = next; setVoiceOn(next);
-    if (!next) { try { window.speechSynthesis?.cancel(); } catch (e) {} }
+    if (next) unlockSpeech();   // このタップも解錠の好機（切→入で初めて語らせる場合）
+    else { try { window.speechSynthesis?.cancel(); } catch (e) {} }
   };
   const reset = () => { resolvePartyNow(); newWorld(1, false); core.current = { F: 0.1, E: 0.5, A: 0.5, lastOp: "—", opFlash: 0 }; bars.current = 0; rebirth.current = 0; render(); };
+
+  /* 初期画面へ戻る：機関を止めて記録を白紙に返す（音響機関は解錠済みのまま温存） */
+  const backToTitle = () => {
+    if (recState === "rec") stopRec();          // 録画中なら書き出してから戻る
+    try { Tone.Transport.pause(); } catch (e) {}
+    try { window.speechSynthesis?.cancel(); } catch (e) {}
+    setRunning(false); runningRef.current = false;
+    setStarted(false); startedRef.current = false;
+    world.current = null;
+    core.current = { F: 0.1, E: 0.5, A: 0.5, lastOp: "—", opFlash: 0 };
+    battle.current = { foe: null, dogAnim: 0, foeAnim: 0, dogHurt: 0, foeHurt: 0, foeKO: 0, floats: [], cooldown: 0 };
+    logRef.current = [];
+    narr.current = { text: "", at: 0 };
+    ascends.current = []; bigAscend.current = null;
+    bars.current = 0; rebirth.current = 0; combatLvl.current = 0;
+    render();
+  };
 
   useEffect(() => {
     // iOS対策：バックグラウンド復帰時にAudioContextを再開する
@@ -1153,6 +1201,7 @@ export default function TankenInfinity() {
   // iOS対策：どのタップでも解錠を再試行し、Transportを起こす
   useEffect(() => {
     const wake = () => {
+      unlockSpeech();   // 保険：どのタップでも一度だけ読み上げを解錠する
       try {
         Tone.start();
         Tone.getContext().rawContext.resume();
@@ -1452,11 +1501,12 @@ export default function TankenInfinity() {
               )}
             </div>
 
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", margin: "14px 0" }}>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", margin: "14px 0" }}>
               {running
                 ? <button onClick={pause} style={btnStyle(false)}>❚❚ 停止</button>
                 : <button onClick={start} style={btnStyle(true)}>▶ 再開</button>}
               <button onClick={reset} style={btnStyle(false)}>新しい迷宮</button>
+              <button onClick={backToTitle} style={{ ...btnStyle(false), color: "#8d7bb5", borderColor: "#4a4336" }}>◀ 初期画面</button>
               <button onClick={toggleVoice} style={{ ...btnStyle(false), color: voiceOn ? "#c8963e" : "#655d4c" }}>
                 {voiceOn ? "語り 入" : "語り 切"}
               </button>
