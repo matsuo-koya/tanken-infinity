@@ -74,6 +74,66 @@ const FLAVOR = {
   depth: d => (d < 3 ? `地下${d}階——空気はまだ乾いている` : d < 5 ? `地下${d}階——冷気が肌を刺す` : `地下${d}階——闇が濃い。竜の気配がする`),
 };
 
+/* 初期画面の導入文。戻るたびに別の言い回しが出る */
+const TITLE_BLURBS = [
+  [
+    "選ばれし者が、音楽に導かれて迷宮を自動で探査します。",
+    "偏差機関の「飽き」が旋律を変え、深部へと誘います。",
+    "あなたはただ、見ていてください。",
+  ],
+  [
+    "命はひとりでに歩きます。導くのはあなたではなく、音楽です。",
+    "旋律に飽きたとき、偏差機関はより深い階を欲しがります。",
+    "灯を持たず、その背を見送ってください。",
+  ],
+  [
+    "この迷宮に地図はありません。あるのは拍と、慣れと、逸れていく旋律だけ。",
+    "飽きが臨界に達するたび、歩みは下へ下へと逸れていきます。",
+    "操作は要りません。ただ聴いて、見ていてください。",
+  ],
+  [
+    "音が鳴りはじめると、命は勝手に潜っていきます。",
+    "同じ調べに慣れるほど、偏差機関は深部への渇きを募らせます。",
+    "見届けること以外に、あなたにできることはありません。",
+  ],
+  [
+    "ここでは音楽が地図であり、飽きが羅針盤です。",
+    "旋律が澱むたび、機関は次の階への逸脱を選びます。",
+    "手を出さずに、その一生を見ていてください。",
+  ],
+];
+
+/* 下部の偏差機関の解説。新しい迷宮／初期画面のたびに言い換わる（内容は同一） */
+const CODA_TEXTS = [
+  [
+    "慣れFが閾値を超えると偏差機関がMEDIANT等のオペレータで旋律を逸脱させ、同時に探索衝動（未踏領域・階段への効用）が上昇します。",
+    "敵は非警戒時は漢字、警戒すると絵文字で表示。主人公は歩行ごとに漢字⇄絵文字が切り替わり、移動方向で左右反転します。二人旅では相棒が後ろを追従し、戦闘にも参加。先頭が倒れると相棒が歩みを継ぎます。",
+    "全滅すると「怒りの日」による鎮魂歌が流れ、光とともに新しい命が生まれ直します。",
+  ],
+  [
+    "偏差機関は慣れFを絶えず測っています。閾値を越えるとMEDIANT等のオペレータが旋律を横へ滑らせ、同時に未踏領域と階段の効用が跳ね上がります——飽きが、そのまま下降の意志になります。",
+    "盤面では、敵は警戒するまで漢字、気づくと絵文字。主人公は一歩ごとに漢字と絵文字を往復し、向いた方向へ反転します。二人旅なら相棒が背後を追い、戦列にも加わります。先頭が倒れても、歩みは相棒に引き継がれます。",
+    "全滅の際は「怒りの日」が鎮魂に鳴り、やがて光とともに新しい命が生まれ直します。",
+  ],
+  [
+    "旋律への慣れFが閾値に達した瞬間、偏差機関はMEDIANT等のオペレータで調べを逸らし、探索衝動——未踏の区画や階段へ向かう効用——を同時に押し上げます。",
+    "表示の約束事：敵は非警戒なら漢字、警戒すると絵文字。主人公は歩くたびに漢字⇄絵文字が入れ替わり、進む向きに合わせて左右が反転します。二人旅では相棒が後ろをついてきて戦いにも加わり、先頭が斃れれば歩みを継ぎます。",
+    "全滅すれば「怒りの日」の鎮魂歌。そして光が差し、新しい命が生まれ直します。",
+  ],
+  [
+    "この迷宮を動かしているのは慣れFです。閾値を越えると偏差機関がMEDIANT等のオペレータを起動し、旋律を逸脱させると同時に、未踏領域や階段への効用＝探索衝動を高めます。",
+    "敵は非警戒時が漢字、警戒すると絵文字に変わります。主人公は一歩ごとに漢字と絵文字を切り替え、移動方向で左右反転。二人旅では相棒が後ろを追従して戦闘にも参加し、先頭が倒れたときは歩みを継ぎます。",
+    "全滅すると「怒りの日」による鎮魂歌が流れ、光とともに新しい命が生まれ直します。",
+  ],
+];
+
+/* 直前と同じものを引かないように選ぶ */
+const pickOther = (len, cur) => {
+  if (len < 2) return 0;
+  const i = Math.floor(Math.random() * (len - 1));
+  return i >= cur ? i + 1 : i;
+};
+
 const CHARACTERS = {
   dog:   { k: "犬", e: "🐕", name: "犬", hp: 30, atk: 3, verb: "噛みついた" },
   cat:   { k: "猫", e: "🐈", name: "猫", hp: 26, atk: 3, verb: "引っ掻いた" },
@@ -213,6 +273,11 @@ export default function TankenInfinity() {
   const jaVoice = useRef(null);
   const ttsUnlocked = useRef(false);
   const speakSeq = useRef(0);
+  // 解説文の言い回し。毎フレーム再描画されるので、選んだ結果はrefに寝かせておく
+  const variant = useRef({
+    blurb: Math.floor(Math.random() * TITLE_BLURBS.length),
+    coda: Math.floor(Math.random() * CODA_TEXTS.length),
+  });
 
   function loadVoices() {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -1168,7 +1233,7 @@ export default function TankenInfinity() {
     if (next) unlockSpeech();   // このタップも解錠の好機（切→入で初めて語らせる場合）
     else { try { window.speechSynthesis?.cancel(); } catch (e) {} }
   };
-  const reset = () => { resolvePartyNow(); newWorld(1, false); core.current = { F: 0.1, E: 0.5, A: 0.5, lastOp: "—", opFlash: 0 }; bars.current = 0; rebirth.current = 0; render(); };
+  const reset = () => { resolvePartyNow(); newWorld(1, false); core.current = { F: 0.1, E: 0.5, A: 0.5, lastOp: "—", opFlash: 0 }; bars.current = 0; rebirth.current = 0; variant.current.coda = pickOther(CODA_TEXTS.length, variant.current.coda); render(); };
 
   /* 初期画面へ戻る：機関を止めて記録を白紙に返す（音響機関は解錠済みのまま温存） */
   const backToTitle = () => {
@@ -1184,6 +1249,11 @@ export default function TankenInfinity() {
     narr.current = { text: "", at: 0 };
     ascends.current = []; bigAscend.current = null;
     bars.current = 0; rebirth.current = 0; combatLvl.current = 0;
+    // 戻ってきた初期画面では別の言い回しで迎える
+    variant.current = {
+      blurb: pickOther(TITLE_BLURBS.length, variant.current.blurb),
+      coda: pickOther(CODA_TEXTS.length, variant.current.coda),
+    };
     render();
   };
 
@@ -1327,9 +1397,9 @@ export default function TankenInfinity() {
               {partySel === "random" ? "？" : (PARTY_OPTIONS.find(o => o.id === partySel)?.members || ["dog"]).map(k => CHARACTERS[k].k).join("")}
             </div>
             <p style={{ color: "#8f8672", fontSize: 13, lineHeight: 1.9, maxWidth: 420, margin: "0 auto 20px" }}>
-              選ばれし者が、音楽に導かれて迷宮を自動で探査します。<br />
-              偏差機関の「飽き」が旋律を変え、深部へと誘います。<br />
-              あなたはただ、見ていてください。
+              {TITLE_BLURBS[variant.current.blurb].map((line, i) => (
+                <React.Fragment key={i}>{i > 0 && <br />}{line}</React.Fragment>
+              ))}
             </p>
             <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 12 }}>
               {PARTY_OPTIONS.map(o => (
@@ -1558,9 +1628,7 @@ export default function TankenInfinity() {
             </div>
 
             <p style={{ fontSize: 11, color: "#655d4c", lineHeight: 1.9, marginTop: 16 }}>
-              慣れFが閾値を超えると偏差機関がMEDIANT等のオペレータで旋律を逸脱させ、同時に探索衝動（未踏領域・階段への効用）が上昇します。
-              敵は非警戒時は漢字、警戒すると絵文字で表示。主人公は歩行ごとに漢字⇄絵文字が切り替わり、移動方向で左右反転します。二人旅では相棒が後ろを追従し、戦闘にも参加。先頭が倒れると相棒が歩みを継ぎます。
-              全滅すると「怒りの日」による鎮魂歌が流れ、光とともに新しい命が生まれ直します。
+              {CODA_TEXTS[variant.current.coda].join("")}
             </p>
           </>
         )}
