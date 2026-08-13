@@ -604,6 +604,18 @@ export default function TankenInfinity() {
   }
   const selectStyle = (id) => { setMusicSel(id); musicSelRef.current = id; if (started) applyStyle(id); };
 
+  /* おまかせのときは、生まれ変わるたびに楽風も引き直す（直前と同じものは引かない）。
+     Transportのコールバックから呼ばれ、そこでは`started`が初回描画のまま古いので、
+     selectStyleは使わずrefとapplyStyleを直に叩く。 */
+  function reshuffleStyle() {
+    const ids = Object.keys(MUSIC_STYLES);
+    const cur = ids.indexOf(musicSelRef.current);
+    const next = ids[pickOther(ids.length, cur < 0 ? 0 : cur)];
+    musicSelRef.current = next;
+    setMusicSel(next);
+    applyStyle(next);
+  }
+
   /* ---------------- オーディオ初期化 ---------------- */
   async function initAudio() {
     await Tone.start();
@@ -836,6 +848,8 @@ export default function TankenInfinity() {
       w.deadTimer++;
       if (w.deadTimer > (isBaroque(music.current.style) ? 64 : 20)) {
         resolvePartyNow();
+        // おまかせ：新しい命とともに楽風も変わる（requiemの長さは旧楽風で判定済み）
+        if (partySelRef.current === "random") reshuffleStyle();
         newWorld(1, false);
         rebirth.current = 20;
         fanfIdx.current = 0;
