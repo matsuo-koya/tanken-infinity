@@ -352,6 +352,7 @@ export default function TankenInfinity() {
   const jaVoice = useRef(null);
   const ttsUnlocked = useRef(false);
   const speakSeq = useRef(0);
+  const prioHold = useRef(0);   // この時刻までは格下の語りを差し込まない
   // 解説文の言い回し。毎フレーム再描画されるので、選んだ結果はrefに寝かせておく
   const variant = useRef({
     blurb: Math.floor(Math.random() * TITLE_BLURBS.length),
@@ -410,10 +411,19 @@ export default function TankenInfinity() {
     } catch (e) { /* 読み上げ非対応環境では無音で継続 */ }
   }
 
-  function narrate(text) {
+  /* 語り。prio>0は「落命」など言い切らせたいもの。
+     読み終わるまでの間、格下の語り（情景・戦闘の出入り）は差し込ませない。 */
+  function narrate(text, prio = 0) {
+    if (prio === 0 && Date.now() < prioHold.current) return;
     const nm = world.current?.dog?.name;
     const t = nm && nm !== "犬" ? text.split("犬").join(nm) : text;
-    narr.current = { text: t, at: Date.now() }; speak(t);
+    narr.current = { text: t, at: Date.now() };
+    if (prio > 0) {
+      // 読み上げ所要の見積り（日本語はおよそ毎秒6字、速度倍率で割る）＋余白
+      const sec = [...t].length / (6 * speechRateRef.current);
+      prioHold.current = Date.now() + Math.min(8000, 500 + sec * 1000);
+    }
+    speak(t);
   }
   const beatFlip = useRef(false);
   const stepIdx = useRef(0);
@@ -825,7 +835,7 @@ export default function TankenInfinity() {
         newWorld(1, false);
         rebirth.current = 20;
         fanfIdx.current = 0;
-        narrate("新しい命が生まれ、迷宮に降り立った");
+        narrate("新しい命が生まれ、迷宮に降り立った", 1);   // 落命の保留に潰されないよう対で優先
         Tone.Transport.bpm.rampTo(MUSIC_STYLES[music.current.style].bpm, 1);
         audio.current?.filt.frequency.rampTo(9000, 1);
         audio.current?.verb.wet.rampTo(MUSIC_STYLES[music.current.style].verbWet, 1.5);
@@ -959,13 +969,13 @@ export default function TankenInfinity() {
         sfx("ascend", time);
         pushLog(`${dog.name}は倒れた…${bu.name}が歩みを継ぐ`, "fight");
         w.dog = { ...bu, x: dog.x, y: dog.y, hunger: dog.hunger, gold: dog.gold };
-        narrate(`${dog.name}は光に包まれ、昇っていった。${bu.name}が歩みを継ぐ`);
+        narrate(`${dog.name}は光に包まれ、昇っていった。${bu.name}が歩みを継ぐ`, 1);
       } else {
         w.dead = true; w.deadTimer = 0; reqIdx.current = 0;
         reqMel.current = music.current.root + 15;      // 上声は上方の三度圏から降りはじめる
         reqBass.current = music.current.root - 24;
         pushLog(`${dog.name}は倒れた…（記録：地下${w.depth}階・金${dog.gold}）`, "fight");
-        narrate(`${dog.name}は倒れた——鎮魂の調べが流れる`);
+        narrate(`${dog.name}は倒れた——鎮魂の調べが流れる`, 1);
         Tone.Transport.bpm.rampTo(60, 2);
         audio.current.dist.wet.rampTo(0, 0.5);
         audio.current.filt.frequency.rampTo(3500, 2);
@@ -1058,7 +1068,7 @@ export default function TankenInfinity() {
           bigAscend.current = { em: tgt.em, name: tgt.name, t: 0 };
           sfx("ascend", time);
           pushLog(`${tgt.name}は倒れた…`, "fight");
-          narrate(`${tgt.name}は光に包まれ、昇っていった。${dog.name}はひとりで歩き出す`);
+          narrate(`${tgt.name}は光に包まれ、昇っていった。${dog.name}はひとりで歩き出す`, 1);
         }
         continue;
       }
@@ -1312,7 +1322,7 @@ export default function TankenInfinity() {
     if (next) unlockSpeech();   // このタップも解錠の好機（切→入で初めて語らせる場合）
     else { try { window.speechSynthesis?.cancel(); } catch (e) {} }
   };
-  const reset = () => { resolvePartyNow(); newWorld(1, false); core.current = { F: 0.1, E: 0.5, A: 0.5, lastOp: "—", opFlash: 0 }; bars.current = 0; rebirth.current = 0; variant.current.coda = pickOther(CODA_TEXTS.length, variant.current.coda); render(); };
+  const reset = () => { prioHold.current = 0; resolvePartyNow(); newWorld(1, false); core.current = { F: 0.1, E: 0.5, A: 0.5, lastOp: "—", opFlash: 0 }; bars.current = 0; rebirth.current = 0; variant.current.coda = pickOther(CODA_TEXTS.length, variant.current.coda); render(); };
 
   /* 初期画面へ戻る：機関を止めて記録を白紙に返す（音響機関は解錠済みのまま温存） */
   const backToTitle = () => {
@@ -1327,7 +1337,7 @@ export default function TankenInfinity() {
     logRef.current = [];
     narr.current = { text: "", at: 0 };
     ascends.current = []; bigAscend.current = null;
-    bars.current = 0; rebirth.current = 0; combatLvl.current = 0;
+    bars.current = 0; rebirth.current = 0; combatLvl.current = 0; prioHold.current = 0;
     // 戻ってきた初期画面では別の言い回しで迎える
     variant.current = {
       blurb: pickOther(TITLE_BLURBS.length, variant.current.blurb),
