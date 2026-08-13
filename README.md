@@ -18,11 +18,20 @@ npm run dev
 
 ## デプロイ（GitHub Pages）
 
-1. このリポジトリをGitHubへpush（mainブランチ）
-2. リポジトリの Settings → Pages → Source を **GitHub Actions** に設定
-3. push のたびに `.github/workflows/deploy.yml` が自動でビルド・公開
+公開URL: **https://matsuo-koya.github.io/tanken-infinity/**
 
-公開URL: `https://<ユーザー名>.github.io/<リポジトリ名>/`
+設定は完了済みです。`main` へpushするたびに `.github/workflows/deploy.yml` が
+自動でビルド・公開します（Settings → Pages → Source は **GitHub Actions**）。
+
+手元でビルドを確かめる場合:
+
+```bash
+npm run build     # dist/ を生成
+npm run preview   # dist/ をローカルで配信して確認
+```
+
+`vite.config.js` の `base: "./"` により相対パスで出力されるため、
+別のリポジトリ名へフォークしてもそのまま動きます。
 
 ## 注意（iOS）
 
