@@ -58,6 +58,34 @@ const OPERATORS = ["MEDIANT", "旋法交替", "転位", "跳躍", "間引き", "
 const KANJI_NUM = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
 const kanjiNum = n => (n >= 0 && n <= 10 ? KANJI_NUM[n] : String(n));
 
+// 配列から一つ引く（genDungeon内のローカルなpickとは別物なので名前を分ける）
+const pickOne = arr => arr[Math.floor(Math.random() * arr.length)];
+
+// 階層の深さで空気が変わる。同じ階でも降りるたびに言葉は変わる
+const DEPTH_NOTES = {
+  shallow: [
+    "空気はまだ乾いている",
+    "埃の匂いがする。まだ浅い",
+    "壁はまだ、手で温められそうだ",
+    "光の記憶が、かすかに残っている",
+    "苔の匂いが薄い。地上はまだ近い",
+  ],
+  mid: [
+    "冷気が肌を刺す",
+    "石が汗をかいている",
+    "足音の反響が、遠くなった",
+    "空気が重い。息が白む",
+    "水の匂いが混じりはじめた",
+  ],
+  deep: [
+    "闇が濃い。竜の気配がする",
+    "音が沈む。ここでは旋律さえ痩せる",
+    "骨が多い。誰かの終点だったのだろう",
+    "岩の奥で、何かが眠っている",
+    "闇に厚みがある。手で押し返せそうだ",
+  ],
+};
+
 const FLAVOR = {
   ambient: [
     "どこかで水の滴る音がする",
@@ -65,13 +93,64 @@ const FLAVOR = {
     "冷たい風が通路を抜けていく",
     "遠くで何かが動いた気がした",
     "足音だけが拍に合わせて響く",
+    "天井から砂がこぼれ落ちた",
+    "松明のない道を、耳だけで測っていく",
+    "壁の彫りが、途中で絶えている",
+    "自分の影が、拍のたびに伸び縮みする",
+    "どこかの扉が、風で軋んだ",
+    "埃が舞い、拍の隙間で光った",
+    "通路の奥から、かすかな反響が返ってくる",
   ],
-  hungry: ["腹の虫が鳴いた。肉の匂いを探している", "空腹が思考を単純にしていく"],
-  low: ["傷が疼く。犬は用心深くなった", "息が浅い。薬の在り処を思い出そうとする"],
-  bored: ["旋律が逸れはじめる。この階に飽きたのだ", "慣れが限界に達し、犬は階段を思う"],
-  combatStart: ["牙が閃く——律動が加速する", "毛が逆立つ。戦いの拍子だ"],
-  combatEnd: ["静寂が戻り、旋律が緩む", "息を整え、また歩き出した"],
-  depth: d => (d < 3 ? `地下${d}階——空気はまだ乾いている` : d < 5 ? `地下${d}階——冷気が肌を刺す` : `地下${d}階——闇が濃い。竜の気配がする`),
+  hungry: [
+    "腹の虫が鳴いた。肉の匂いを探している",
+    "空腹が思考を単純にしていく",
+    "犬は肉を思い出し、足を速めた",
+    "胃が縮む。次の角に何かあればいい",
+    "飢えが、注意力を削っていく",
+    "匂いのしない道が続く。腹が鳴る",
+  ],
+  // 手負いは戦闘と地続きなので、こちらも短めに
+  low: [
+    "傷が疼く",
+    "息が浅い",
+    "血の匂い。自分のものだ",
+    "痛みが拍を刻む",
+    "視界の縁が暗い",
+    "まだ倒れない",
+  ],
+  bored: [
+    "旋律が逸れはじめる。この階に飽きたのだ",
+    "慣れが限界に達し、犬は階段を思う",
+    "同じ拍が続きすぎた。耳が新しさを欲している",
+    "見飽きた壁。機関が別の調べを探しはじめる",
+    "反復が飽和する。逸脱だけが出口だ",
+    "この階の音を、もう覚えてしまった",
+  ],
+  // 戦闘中は展開が速い。語り終わる前に状況が変わらないよう、短く切る
+  combatStart: [
+    "牙が閃く",
+    "毛が逆立つ",
+    "間合いが消えた",
+    "影が跳ねた",
+    "拍が速まる",
+    "低音が唸る",
+    "来る",
+  ],
+  combatEnd: [
+    "静寂が戻る",
+    "息を整える",
+    "拍がほどける",
+    "気配が絶えた",
+    "音が退く",
+    "また歩き出す",
+  ],
+  depth: d => `地下${d}階——${pickOne(d < 3 ? DEPTH_NOTES.shallow : d < 5 ? DEPTH_NOTES.mid : DEPTH_NOTES.deep)}`,
+};
+
+// 行動記録に載る戦闘の出入り
+const COMBAT_LOGS = {
+  start: ["戦闘の気配", "敵影", "間合いが消えた", "拍が速まる"],
+  end: ["静寂が戻った", "律動が緩んだ", "気配が絶えた", "拍がほどけた"],
 };
 
 /* 初期画面の導入文。戻るたびに別の言い回しが出る */
@@ -463,12 +542,13 @@ export default function TankenInfinity() {
     if (c.opFlash > 0) c.opFlash--;
     // 物語ナレーション（控えめに、状況依存で）
     const wv = world.current;
-    if (wv && !wv.dead && Date.now() - narr.current.at > 7000 && bars.current % 6 === 0) {
+    // 戦闘中は長い情景描写を挟まない（戦闘の出入りの短い語りに任せる）
+    if (wv && !wv.dead && !wv.combat && Date.now() - narr.current.at > 7000 && bars.current % 6 === 0) {
       const pool = wv.dog.hp < 10 ? FLAVOR.low
         : wv.dog.hunger > 70 ? FLAVOR.hungry
         : c.F > 0.7 ? FLAVOR.bored
         : FLAVOR.ambient;
-      narrate(pool[Math.floor(Math.random() * pool.length)]);
+      narrate(pickOne(pool));
     }
   }
 
@@ -859,9 +939,8 @@ export default function TankenInfinity() {
             "8n", time, 0.35);
         } catch (e) { /* non-fatal */ }
       }
-      pushLog(inCombat ? "戦闘の気配——律動が加速する" : "静寂が戻った", "sys");
-      const pool = inCombat ? FLAVOR.combatStart : FLAVOR.combatEnd;
-      narrate(pool[Math.floor(Math.random() * pool.length)]);
+      pushLog(pickOne(inCombat ? COMBAT_LOGS.start : COMBAT_LOGS.end), "sys");
+      narrate(pickOne(inCombat ? FLAVOR.combatStart : FLAVOR.combatEnd));
     }
     // 戦闘演出カウンタの減衰
     const bb = battle.current;
