@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="UTF-8"><title>FPS harness</title>
+<style>body{margin:0;background:#14120e;color:#b3a486;font-family:serif}
+figure{margin:10px}figcaption{font-size:12px;padding:4px 0}
+.row{display:flex;flex-wrap:wrap}</style></head>
+<body><div class="row" id="root"></div>
+<script type="module">
+import { drawFPS } from "/src/fpsView.js";
+
+const W = 23, H = 15;
+const ITEM_TYPES = { meat:{k:"肉",e:"🍖"}, potion:{k:"薬",e:"🧪"}, gold:{k:"金",e:"💰"} };
+
+// 手で組んだ迷宮：中央に広い部屋、東に通路、通路の先に小部屋
+const map = Array.from({length:H},()=>Array(W).fill("wall"));
+for (let y=5;y<11;y++) for (let x=2;x<10;x++) map[y][x]="floor";
+for (let x=10;x<17;x++) map[7][x]="hall";
+for (let y=5;y<10;y++) for (let x=17;x<21;x++) map[y][x]="floor";
+map[7][10]="door";
+const explored = new Set();
+for (let y=0;y<H;y++) for (let x=0;x<W;x++) explored.add(y*W+x);
+
+const mkWorld = (o={}) => ({
+  depth:1, map, explored,
+  stairs:{x:19,y:6},
+  items:[{type:"meat",x:6,y:9},{type:"gold",x:8,y:6},{type:"potion",x:18,y:8}],
+  enemies:[
+    {k:"鼠",e:"🐀",x:7,y:7,alerted:false,id:0},
+    {k:"蝠",e:"🦇",x:13,y:7,alerted:true,id:1},
+    {k:"竜",e:"🐉",x:19,y:7,alerted:true,id:2},
+  ],
+  dog:{x:4,y:7,head:0,em:"🚶",kj:"人",name:"人"},
+  buddy:null, combat:false, dead:false,
+  ...o,
+});
+
+const cache = {};
+const shots = [
+  ["東を向く（門と敵、奥に階段）", mkWorld(), 0, 0],
+  ["相棒の犬が目の前に",           mkWorld({buddy:{em:"🐕",kj:"犬"}}), 0, 0],
+  ["蝠が間近（血の翳り）",         mkWorld({dog:{x:12,y:7,head:0,em:"🚶",kj:"人",name:"人"}}), 0, 1200],
+  ["北を向く（壁のテクスチャ）",   mkWorld({dog:{x:6,y:8,head:-Math.PI/2,em:"🚶",kj:"人",name:"人"}}), 0, 0],
+  ["斜め（歪みの確認）",           mkWorld({dog:{x:5,y:9,head:-Math.PI/4,em:"🚶",kj:"人",name:"人"}}), 0, 0],
+];
+
+const root = document.getElementById("root");
+for (const [label, world, _, tOff] of shots) {
+  const fig = document.createElement("figure");
+  const cv = document.createElement("canvas");
+  const CW = 460, CH = 285;
+  cv.width = CW; cv.height = CH;
+  cv.style.width = CW+"px"; cv.style.height = CH+"px";
+  const cam = { x: world.dog.x+0.5, y: world.dog.y+0.5, ang: world.dog.head, of: world };
+  drawFPS(cv.getContext("2d"), CW, CH, { world, cam, cache, W, H, ITEM_TYPES, now: 1000+tOff });
+  const cap = document.createElement("figcaption"); cap.textContent = label;
+  fig.appendChild(cv); fig.appendChild(cap); root.appendChild(fig);
+}
+document.title = "FPS harness ready";
+</script></body></html>

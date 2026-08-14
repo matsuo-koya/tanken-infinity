@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as Tone from "tone";
+import { drawFPS as drawFPSRaw, stepCam as stepCamRaw } from "./fpsView.js";
 
 /* ============================================================
    探犬∞ TANKEN INFINITY
@@ -443,7 +444,7 @@ export default function TankenInfinity() {
     const prev = world.current;
     const defs = partyRef.current.map(key => CHARACTERS[key]);
     const mk = def => ({
-      x: d.start.x, y: d.start.y, frame: 0, facing: -1,
+      x: d.start.x, y: d.start.y, frame: 0, facing: -1, head: 0,
       kj: def.k, em: def.e, name: def.name, verb: def.verb,
       hp: def.hp, maxHp: def.hp, atk: def.atk,
     });
@@ -894,6 +895,8 @@ export default function TankenInfinity() {
         if (nxt) {
           const prevPos = { x: dog.x, y: dog.y };
           if (nxt.x !== dog.x) dog.facing = nxt.x > dog.x ? 1 : -1;
+          // 一人称視点のための方位（画面下向きがy+なのでatan2の順はdy,dx）
+          dog.head = Math.atan2(nxt.y - dog.y, nxt.x - dog.x);
           dog.x = nxt.x; dog.y = nxt.y; dog.frame ^= 1;
           // 相棒はリーダーの直前位置へ追従
           if (w.buddy && (w.buddy.x !== prevPos.x || w.buddy.y !== prevPos.y)) {
@@ -1110,6 +1113,39 @@ export default function TankenInfinity() {
     }
   }
 
+  /* ---------------- 一人称視点（レイキャスティング） ----------------
+     盤面の状態はそのまま。描画だけを差し替える。壁は「壁」の一字を
+     テクスチャに焼いて貼り、敵・品物・門は距離で拡大する板として置く。 */
+  const [viewMode, setViewMode] = useState("top");
+  const viewModeRef = useRef("top");
+  const fpsCanvas = useRef(null);
+  const cam = useRef({ x: 0, y: 0, ang: 0, of: null });   // of=どの迷宮に対する位置か
+  const tiles = useRef({});
+  const toggleView = () => {
+    const next = viewModeRef.current === "top" ? "fps" : "top";
+    viewModeRef.current = next; setViewMode(next); render();
+  };
+
+  // 描画本体はfpsView.jsに置いた（確認用ハーネスと同じものを呼ぶため）
+  const drawFPS = (ctx, cw, chh) => drawFPSRaw(ctx, cw, chh, {
+    world: world.current, cam: cam.current, cache: tiles.current, W, H, ITEM_TYPES,
+  });
+  const stepCam = (dt) => stepCamRaw(cam.current, world.current, dt);
+
+  useEffect(() => {
+    if (!started || viewMode !== "fps") return;
+    let raf = 0, last = performance.now();
+    const loop = (t) => {
+      const dt = Math.min(0.05, (t - last) / 1000); last = t;
+      stepCam(dt);
+      const cv = fpsCanvas.current;
+      if (cv) { const g = cv.getContext("2d"); if (g) drawFPS(g, cv.width, cv.height); }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [started, viewMode]);
+
   /* ---------------- MP4録画 ---------------- */
   const recCanvas = useRef(null);
   const [recState, setRecState] = useState("idle");
@@ -1131,6 +1167,15 @@ export default function TankenInfinity() {
       (wv.buddy ? `　${wv.buddy.name}♥${Math.max(0, wv.buddy.hp)}` : "") +
       `　金${wv.dog.gold}　♪${MUSIC_STYLES[music.current.style].label}・${SCALES[music.current.scaleKey].name}`;
     ctx.fillText(hud, ox, 22);
+    // 一人称のときは録画も一人称で
+    if (viewModeRef.current === "fps") {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(ox, oy, cv.width - ox * 2, cv.height - oy - 12); ctx.clip();
+      ctx.translate(ox, oy);
+      drawFPS(ctx, cv.width - ox * 2, cv.height - oy - 12);
+      ctx.restore();
+      return;
+    }
     // グリッド
     ctx.textAlign = "center";
     const flipB = beatFlip.current;
@@ -1406,6 +1451,10 @@ export default function TankenInfinity() {
   const m = music.current;
   const flip = beatFlip.current;
   const cell = typeof window !== "undefined" ? Math.max(16, Math.min(26, Math.floor((Math.min(window.innerWidth, 720) - 28) / W))) : 24;
+  // 一人称の画面は俯瞰と同じ幅にして、切り替えでレイアウトが跳ねないようにする
+  const fpsW = W * cell + 12;
+  const fpsH = Math.round(fpsW * 0.62);
+  const fpsDpr = typeof window !== "undefined" ? Math.min(2, window.devicePixelRatio || 1) : 1;
 
   function cellVisual(wv, x, y, flipB) {
     const k = y * W + x;
@@ -1549,15 +1598,25 @@ export default function TankenInfinity() {
         {started && w && (
           <>
             <div style={{ position: "relative", width: "fit-content", margin: "0 auto" }}>
-              <div style={{
-                display: "grid", gridTemplateColumns: `repeat(${W}, ${cell}px)`,
-                background: "#100e0a", border: "1px solid #322d22", borderRadius: 6,
-                padding: 6,
-                boxShadow: w.combat ? "0 0 24px rgba(217,85,63,0.15)" : "none", transition: "box-shadow 600ms",
-              }}>{cells}</div>
+              {viewMode === "fps" ? (
+                <canvas ref={fpsCanvas}
+                  width={Math.round(fpsW * fpsDpr)} height={Math.round(fpsH * fpsDpr)}
+                  style={{
+                    display: "block", width: fpsW, height: fpsH,
+                    background: "#100e0a", border: "1px solid #322d22", borderRadius: 6,
+                    boxShadow: w.combat ? "0 0 24px rgba(217,85,63,0.15)" : "none", transition: "box-shadow 600ms",
+                  }} />
+              ) : (
+                <div style={{
+                  display: "grid", gridTemplateColumns: `repeat(${W}, ${cell}px)`,
+                  background: "#100e0a", border: "1px solid #322d22", borderRadius: 6,
+                  padding: 6,
+                  boxShadow: w.combat ? "0 0 24px rgba(217,85,63,0.15)" : "none", transition: "box-shadow 600ms",
+                }}>{cells}</div>
+              )}
 
-              {/* 昇天：天使の輪とともに上へ消えていく */}
-              {ascends.current.map(asc => (
+              {/* 昇天：天使の輪とともに上へ消えていく（俯瞰のみ。一人称では板として描く） */}
+              {viewMode === "top" && ascends.current.map(asc => (
                 <div key={asc.id} style={{
                   position: "absolute", left: 6 + asc.x * cell, top: 6 + asc.y * cell - asc.t * 5,
                   width: cell, textAlign: "center", pointerEvents: "none", zIndex: 2,
@@ -1684,6 +1743,9 @@ export default function TankenInfinity() {
                 : <button onClick={start} style={btnStyle(true)}>▶ 再開</button>}
               <button onClick={reset} style={btnStyle(false)}>新しい迷宮</button>
               <button onClick={backToTitle} style={{ ...btnStyle(false), color: "#8d7bb5", borderColor: "#4a4336" }}>◀ 初期画面</button>
+              <button onClick={toggleView} style={{ ...btnStyle(false), color: viewMode === "fps" ? "#d9553f" : "#b3a486" }}>
+                {viewMode === "fps" ? "◈ 一人称" : "▦ 俯瞰"}
+              </button>
               <button onClick={toggleVoice} style={{ ...btnStyle(false), color: voiceOn ? "#c8963e" : "#655d4c" }}>
                 {voiceOn ? "語り 入" : "語り 切"}
               </button>
