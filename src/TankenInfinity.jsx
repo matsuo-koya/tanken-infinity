@@ -956,6 +956,9 @@ export default function TankenInfinity() {
       const it = w.items.find(i => i.x === dog.x && i.y === dog.y);
       if (it) {
         w.items = w.items.filter(i => i !== it);
+        // 一人称で手元へ収める見せ場の合図（描画は実時刻で進める）
+        battle.current.pickAt = Date.now();
+        battle.current.pickEm = ITEM_TYPES[it.type].e;
         if (it.type === "meat") { dog.hunger = Math.max(0, dog.hunger - 55); dog.hp = Math.min(dog.maxHp, dog.hp + 2); pushLog("肉を食べた（満腹回復）", "item"); sfx("eat", time); }
         if (it.type === "potion") { dog.hp = Math.min(dog.maxHp, dog.hp + 10); pushLog("薬を舐めた（HP回復）", "item"); sfx("eat", time); }
         if (it.type === "gold") { dog.gold += 10 * w.depth; pushLog(`金貨を拾った（+${10 * w.depth}）`, "item"); sfx("gold", time); }
@@ -1174,6 +1177,7 @@ export default function TankenInfinity() {
   const drawFPS = (ctx, cw, chh) => drawFPSRaw(ctx, cw, chh, {
     world: world.current, cam: cam.current, cache: tiles.current, W, H, ITEM_TYPES,
     swingAt: battle.current.swingAt,
+    pickAt: battle.current.pickAt, pickEm: battle.current.pickEm,
   });
   const stepCam = (dt) => stepCamRaw(cam.current, world.current, dt);
 

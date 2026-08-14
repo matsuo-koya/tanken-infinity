@@ -12,7 +12,8 @@ const SWING_MS = 480;   // 一振りにかける実時間
 const CROWN_MAX = 0.33;
 const PEEK_MAX = (CROWN_MAX - 0.16) / 0.28;
 const SWING_TOP = 0.19;
-const SWORD_CENTER = 0.56;  // 振っている間に剣が寄る横位置 // 切先が真上に来る位置（打撃音の直後に来るよう早めに取る）
+const SWORD_CENTER = 0.56;  // 振っている間に剣が寄る横位置
+const PICK_MS = 780;        // 拾った品を手元へ収めるまでの実時間 // 切先が真上に来る位置（打撃音の直後に来るよう早めに取る）
 const TILE = 96;
 const WALL_H = 2.2;   // 壁の高さ（区画の一辺を1とする）。低いと這うような画になる
 const EYE = 0.85;     // 視点の高さ。壁の半分より低くして、床と敵が正面に来るようにする
@@ -51,7 +52,7 @@ export function stepCam(cam, world, dt) {
 
 /* 視点の主の身体。世界ではなく画面に貼るので、遠近には従わせない。
    画面の下端から一部だけを覗かせることで「そこに居る」感じを出す。 */
-function drawBody(ctx, cw, chh, w, now, swingAt) {
+function drawBody(ctx, cw, chh, w, now, swingAt, pickAt, pickEm) {
   const t = now / 1000;
   const drift = Math.sin(t * 0.83);        // ゆっくりした左右の揺れ
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -65,6 +66,9 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
   // 打撃の合図からの経過。0〜1が一振り
   const sp = (!dead && swingAt) ? (now - swingAt) / SWING_MS : 2;
   const swinging = sp >= 0 && sp < 1;
+  // 拾った品を手元へ収める進み。0〜1のあいだ、品が左手の位置から下りていく
+  const pk = (!dead && pickAt && pickEm) ? (now - pickAt) / PICK_MS : 2;
+  const picking = pk >= 0 && pk < 1;
 
   // 連れの相棒。全身は見せず、手前を横切る上半身だけ（主の最期には出さない）
   if (w.buddy && !dead) {
@@ -106,6 +110,8 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
       const swing = Math.sin(t * 3.4 + phase);      // 片方が前なら、もう片方は後ろ
       // 生きている間は交互に振り、斃れたら振らずに両手とも落ちていく
       let rise = dead ? 0.5 * (1 - fall) : (swing + 1) / 2;
+      // 品を受け取っている間、素手は隠れていて、品が下りるにつれて現れる
+      if (picking && glyph !== SWORD) rise = Math.min(rise, pk * pk);
       let ang = base + lean * rise + (mirror ? -tilt : tilt);   // 斃れると力が抜けて外へ開く
       let alpha = 0.6 + rise * 0.35;
       let hx = px;
@@ -141,6 +147,20 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
       ctx.restore();
     }
     ctx.restore();
+
+    // 拾った品：いったん左手の位置に現れ、そのまま下へ収まっていく
+    if (picking) {
+      const isize = chh * 0.30;
+      const drop = pk * pk;                                  // 落ち込むほど速く
+      const y = chh - isize * 0.34 + drop * isize * 1.5;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, (1 - pk) * 2.2));
+      ctx.font = `${isize}px serif`;
+      ctx.translate(cw * 0.19 + drift * cw * 0.015, y);
+      ctx.rotate(drop * 0.5);
+      ctx.fillText(pickEm, 0, 0);
+      ctx.restore();
+    }
   } else {
     // 獣：ゆっくりした周期で鼻面が下から せり上がっては沈む。
     // 斃れた後は周期を止め、うなだれるように一度だけ沈む
@@ -306,7 +326,7 @@ export function drawFPS(ctx, cw, chh, env) {
   }
   ctx.globalAlpha = 1;
 
-  drawBody(ctx, cw, chh, w, now, env.swingAt);
+  drawBody(ctx, cw, chh, w, now, env.swingAt, env.pickAt, env.pickEm);
 
   // 間近に迫られると視界の縁が血の色に翳る
   if (dread > 0.01) {

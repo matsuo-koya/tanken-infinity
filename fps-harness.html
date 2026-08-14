@@ -26,22 +26,21 @@ const cache = {};
 // 打撃の合図を now より前に置き、振りの各段階を切り出す
 const SW = (ms) => ({ combat:true, __sw: ms });
 const shots = [
-  ["構え（右端）",        mk(8,7,0,{combat:true}), 1386, null],
-  ["打撃 +0.03s",         mk(8,7,0,{combat:true}), 1386, 30],
-  ["打撃 +0.06s",         mk(8,7,0,{combat:true}), 1386, 60],
-  ["打撃 +0.09s（真上・中央）", mk(8,7,0,{combat:true}), 1386, 91],
-  ["打撃 +0.18s",         mk(8,7,0,{combat:true}), 1386, 180],
-  ["打撃 +0.30s",         mk(8,7,0,{combat:true}), 1386, 300],
-  ["振り後（右端へ戻る）", mk(8,7,0,{combat:true}), 1386, 700],
+  ["平常（左手が前）",   mk(8,7,0), 462, null, null],
+  ["拾得 +0.00s",        mk(8,7,0), 462, null, 0],
+  ["拾得 +0.15s",        mk(8,7,0), 462, null, 150],
+  ["拾得 +0.35s",        mk(8,7,0), 462, null, 350],
+  ["拾得 +0.55s",        mk(8,7,0), 462, null, 550],
+  ["拾得 +0.75s（左手が戻る）", mk(8,7,0), 462, null, 750],
 ];
 const root = document.getElementById("root");
-for (const [label, world, nw, swAgo] of shots) {
+for (const [label, world, nw, swAgo, pkAgo] of shots) {
   const fig = document.createElement("figure");
   const cv = document.createElement("canvas");
   const CW = 360, CH = 260;
   cv.width = CW; cv.height = CH; cv.style.width = CW+"px"; cv.style.height = CH+"px";
   const cam = { x: world.dog.x+0.5, y: world.dog.y+0.5, ang: world.dog.head, of: world };
-  drawFPS(cv.getContext("2d"), CW, CH, { world, cam, cache, W, H, ITEM_TYPES, now: nw ?? 1000, swingAt: swAgo == null ? 0 : (nw ?? 1000) - swAgo });
+  drawFPS(cv.getContext("2d"), CW, CH, { world, cam, cache, W, H, ITEM_TYPES, now: nw ?? 1000, swingAt: swAgo == null ? 0 : (nw ?? 1000) - swAgo, pickAt: pkAgo == null ? 0 : (nw ?? 1000) - pkAgo, pickEm: "🧪" });
   const cap = document.createElement("figcaption"); cap.textContent = label;
   fig.appendChild(cv); fig.appendChild(cap); root.appendChild(fig);
 }
