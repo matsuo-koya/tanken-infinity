@@ -91,15 +91,17 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
     // 戦闘に入ると空いた手は拳を握る
     const fighting = w.combat && !dead;
     const bare = fighting ? "✊" : "🤚";
-    // 探索中の素手は指先を左上へ向ける。握った拳は立てたまま
-    const bareBase = fighting ? -0.11 : 0.38;
+    // 探索中の素手は指先を左上へ向ける。握った拳は立てたまま。
+    // 左右反転してから描くので、左上へ向けるには負の角を与える
+    const bareBase = fighting ? -0.11 : -0.42;
     // [横位置, 基準の傾き, 振り出しでの追加の傾き, 左右反転, 位相, 字, 倍率]
     // 剣は素の絵文字だと切先が左下を向くので、半回転させて右上へ構える
+    // [横位置, 基準の傾き, 振り出しでの追加の傾き, 左右反転, 位相, 字, 倍率, 下げ幅]
     const hands = [
-      [0.19, bareBase, -0.11, true, 0, bare, 1.0],
-      [0.88, Math.PI, 0.13, false, Math.PI, SWORD, 1.3],   // 切先は画面外へ出てよい
+      [0.19, bareBase, -0.11, true, 0, bare, 1.0, 0.62],   // 低く構え、振りのたびに出入りする
+      [0.88, Math.PI, 0.13, false, Math.PI, SWORD, 1.3, 0.44],   // 切先は画面外へ出てよい
     ];
-    for (const [px, base, lean, mirror, phase, glyph, mag] of hands) {
+    for (const [px, base, lean, mirror, phase, glyph, mag, off] of hands) {
       const swing = Math.sin(t * 3.4 + phase);      // 片方が前なら、もう片方は後ろ
       // 生きている間は交互に振り、斃れたら振らずに両手とも落ちていく
       let rise = dead ? 0.5 * (1 - fall) : (swing + 1) / 2;
@@ -123,7 +125,7 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
       }
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.translate(cw * px + drift * cw * 0.015, chh + size * 0.44 - rise * size * 0.56);
+      ctx.translate(cw * px + drift * cw * 0.015, chh + size * off - rise * size * 0.56);
       ctx.rotate(ang);
       if (mirror) ctx.scale(-1, 1);
       if (mag !== 1) ctx.font = `${size * mag}px serif`;

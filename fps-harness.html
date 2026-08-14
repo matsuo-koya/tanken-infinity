@@ -26,13 +26,11 @@ const cache = {};
 // 打撃の合図を now より前に置き、振りの各段階を切り出す
 const SW = (ms) => ({ combat:true, __sw: ms });
 const shots = [
-  ["構え",              mk(8,7,0,{combat:true}), 1386, null],
-  ["打撃 +0.03s",       mk(8,7,0,{combat:true}), 1386, 30],
-  ["打撃 +0.09s（真上）", mk(8,7,0,{combat:true}), 1386, 91],
-  ["打撃 +0.20s",       mk(8,7,0,{combat:true}), 1386, 200],
-  ["打撃 +0.35s",       mk(8,7,0,{combat:true}), 1386, 350],
-  ["探索・剣が前",       mk(8,7,0), 1386, null],
-  ["探索・左手が前",     mk(8,7,0), 462, null],
+  ["探索 位相0（左手が前）", mk(8,7,0), 462, null],
+  ["探索 位相1",            mk(8,7,0), 690, null],
+  ["探索 位相2（左手が引く）", mk(8,7,0), 924, null],
+  ["探索 位相3（剣が前）",   mk(8,7,0), 1386, null],
+  ["戦闘（拳）",            mk(8,7,0,{combat:true}), 462, null],
 ];
 const root = document.getElementById("root");
 for (const [label, world, nw, swAgo] of shots) {
