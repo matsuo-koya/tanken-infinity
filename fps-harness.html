@@ -24,16 +24,17 @@ const mk = (x,y,head,o={}) => ({
 const beast = (o={}) => ({ dog:{x:8,y:7,head:0,em:"🐕",kj:"犬",name:"犬"}, ...o });
 const cache = {};
 const shots = [
-  ["人：生存（左手が前）",   mk(8,7,0), 462],
-  ["人：斃れた直後 t=0",     mk(8,7,0,{dead:true,deadTimer:0}), 462],
-  ["人：沈む途中 t=4",       mk(8,7,0,{dead:true,deadTimer:4}), 900],
-  ["人：沈む途中 t=8",       mk(8,7,0,{dead:true,deadTimer:8}), 1500],
-  ["人：沈み切り t=10",      mk(8,7,0,{dead:true,deadTimer:10}), 2200],
-  ["犬：生存（顔が覗く）",   mk(8,7,0,beast()), 3400],
-  ["犬：斃れた直後 t=0",     mk(8,7,0,beast({dead:true,deadTimer:0})), 3400],
-  ["犬：沈む途中 t=5",       mk(8,7,0,beast({dead:true,deadTimer:5})), 5000],
-  ["犬：沈み切り t=10",      mk(8,7,0,beast({dead:true,deadTimer:10})), 6000],
-  ["相棒あり：斃れると消える", mk(8,7,0,{buddy:{em:"🐕",kj:"犬"},dead:true,deadTimer:2}), 900],
+  ["犬：生存",        mk(8,7,0,beast()), 3400],
+  ["犬：斃れ t=0",    mk(8,7,0,beast({dead:true,deadTimer:0})), 3400],
+  ["犬：斃れ t=3",    mk(8,7,0,beast({dead:true,deadTimer:3})), 3400],
+  ["犬：斃れ t=5",    mk(8,7,0,beast({dead:true,deadTimer:5})), 3400],
+  ["犬：斃れ t=7",    mk(8,7,0,beast({dead:true,deadTimer:7})), 3400],
+  ["犬：斃れ t=9",    mk(8,7,0,beast({dead:true,deadTimer:9})), 3400],
+  ["人：生存",        mk(8,7,0), 462],
+  ["人：斃れ t=0",    mk(8,7,0,{dead:true,deadTimer:0}), 462],
+  ["人：斃れ t=4",    mk(8,7,0,{dead:true,deadTimer:4}), 462],
+  ["人：斃れ t=7",    mk(8,7,0,{dead:true,deadTimer:7}), 462],
+  ["人：斃れ t=9",    mk(8,7,0,{dead:true,deadTimer:9}), 462],
 ];
 const root = document.getElementById("root");
 for (const [label, world, nw] of shots) {

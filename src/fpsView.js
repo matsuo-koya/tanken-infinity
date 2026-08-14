@@ -52,6 +52,8 @@ function drawBody(ctx, cw, chh, w, now) {
   const dead = !!w.dead;
   const sink = dead ? Math.min(1, (w.deadTimer || 0) / 10) : 0;
   if (sink >= 1) return;                   // 沈み切ったら何も出さない
+  const fall = sink * sink;                // 崩れ落ちる加速（初めは緩く、やがて一気に）
+  const tilt = fall * 1.05;                // 傾きながら倒れる（約60度まで）
 
   // 連れの相棒。全身は見せず、手前を横切る上半身だけ（主の最期には出さない）
   if (w.buddy && !dead) {
@@ -78,11 +80,11 @@ function drawBody(ctx, cw, chh, w, now) {
     for (const [px, rot, mirror, phase] of [[0.2, -0.22, true, 0], [0.8, 0.22, false, Math.PI]]) {
       const swing = Math.sin(t * 3.4 + phase);      // 片方が前なら、もう片方は後ろ
       // 生きている間は交互に振り、斃れたら振らずに両手とも落ちていく
-      const rise = dead ? 0.5 * (1 - sink) : (swing + 1) / 2;
+      const rise = dead ? 0.5 * (1 - fall) : (swing + 1) / 2;
       ctx.save();
       ctx.globalAlpha = 0.6 + rise * 0.35;
       ctx.translate(cw * px + drift * cw * 0.015, chh + size * 0.44 - rise * size * 0.56);
-      ctx.rotate(rot * (0.5 + rise * 0.5));
+      ctx.rotate(rot * (0.5 + rise * 0.5) + (mirror ? -tilt : tilt));   // 力が抜けて外へ開く
       if (mirror) ctx.scale(-1, 1);
       ctx.fillText("🤚", 0, 0);
       ctx.restore();
@@ -91,14 +93,15 @@ function drawBody(ctx, cw, chh, w, now) {
   } else {
     // 獣：ゆっくりした周期で鼻面が下から せり上がっては沈む。
     // 斃れた後は周期を止め、うなだれるように一度だけ沈む
-    const peek = dead ? 0.6 * (1 - sink) : Math.sin(((t * 0.14) % 1) * Math.PI * 2);
+    const peek = dead ? 0.95 * (1 - fall) : Math.sin(((t * 0.14) % 1) * Math.PI * 2);
     if (peek > 0) {
       const size = chh * 0.62;
       const y = chh + size * 0.34 - peek * size * 0.28;   // せり上がると顔の上半分まで見える
       ctx.save();
       ctx.globalAlpha = 0.9;
       ctx.font = `${size}px serif`;
-      ctx.translate(cw * (0.5 + drift * 0.1), y);
+      ctx.translate(cw * (0.5 + drift * 0.1) + tilt * cw * 0.17, y);   // 傾いた側へ流れる
+      ctx.rotate(tilt);                                   // 首を傾けて崩れる
       ctx.fillText(FACES[w.dog.kj] || w.dog.em, 0, 0);
       ctx.restore();
     }
