@@ -80,18 +80,20 @@ function drawBody(ctx, cw, chh, w, now) {
     // 左は素手、右は剣を握る。剣は少し大きく、切っ先が内へ向くよう寝かせる。
     // 戦闘に入ると空いた手は拳を握る
     const bare = (w.combat && !dead) ? "✊" : "🤚";
+    // [横位置, 基準の傾き, 振り出しでの追加の傾き, 左右反転, 位相, 字, 倍率]
+    // 剣は素の絵文字だと切先が左下を向くので、半回転させて右上へ構える
     const hands = [
-      [0.19, -0.22, true, 0, bare, 1.0],
-      [0.80, 0.30, false, Math.PI, "🗡️", 1.3],
+      [0.19, -0.11, -0.11, true, 0, bare, 1.0],
+      [0.72, Math.PI, 0.13, false, Math.PI, "🗡️", 1.3],
     ];
-    for (const [px, rot, mirror, phase, glyph, mag] of hands) {
+    for (const [px, base, lean, mirror, phase, glyph, mag] of hands) {
       const swing = Math.sin(t * 3.4 + phase);      // 片方が前なら、もう片方は後ろ
       // 生きている間は交互に振り、斃れたら振らずに両手とも落ちていく
       const rise = dead ? 0.5 * (1 - fall) : (swing + 1) / 2;
       ctx.save();
       ctx.globalAlpha = 0.6 + rise * 0.35;
       ctx.translate(cw * px + drift * cw * 0.015, chh + size * 0.44 - rise * size * 0.56);
-      ctx.rotate(rot * (0.5 + rise * 0.5) + (mirror ? -tilt : tilt));   // 力が抜けて外へ開く
+      ctx.rotate(base + lean * rise + (mirror ? -tilt : tilt));   // 斃れると力が抜けて外へ開く
       if (mirror) ctx.scale(-1, 1);
       if (mag !== 1) ctx.font = `${size * mag}px serif`;
       ctx.fillText(glyph, 0, 0);

@@ -670,16 +670,22 @@ export default function TankenInfinity() {
       envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 } }).connect(filt);
     // 打撃系は専用の声を立てる。旋律用のフィルタを通すとHP低下時にこもって
     // 聞こえなくなるので、出力へ直に挿す（語りのダッキングは効いたまま）
-    const impBP = new Tone.Filter({ type: "bandpass", frequency: 1900, Q: 1.1 }).connect(out);
-    const impact = new Tone.NoiseSynth({           // 当たりの擦過音
-      noise: { type: "white" }, volume: -9,
-      envelope: { attack: 0.001, decay: 0.11, sustain: 0 },
-    }).connect(impBP);
+    // 打撃はスネア的な短い擦過音より、クラッシュシンバルのほうが状況が伝わる
+    const crashHP = new Tone.Filter({ type: "highpass", frequency: 3800 }).connect(out);
+    const crash = new Tone.MetalSynth({
+      harmonicity: 5.1, modulationIndex: 32, resonance: 4200, octaves: 1.5,
+      envelope: { attack: 0.001, decay: 1.1, release: 0.3 },
+      volume: -22,
+    }).connect(crashHP);
+    const impact = new Tone.NoiseSynth({           // シンバルに厚みを添える白色雑音
+      noise: { type: "white" }, volume: -16,
+      envelope: { attack: 0.001, decay: 0.7, sustain: 0, release: 0.25 },
+    }).connect(crashHP);
     const thud = new Tone.MembraneSynth({          // 体に響く芯
       octaves: 4, pitchDecay: 0.09, volume: -7,
       envelope: { attack: 0.001, decay: 0.24, sustain: 0, release: 0.05 },
     }).connect(out);
-    audio.current = { out, filt, dist, kick, hat, bass, lead, fx, verb, delay, chorus, strings, organ, impact, thud };
+    audio.current = { out, filt, dist, kick, hat, bass, lead, fx, verb, delay, chorus, strings, organ, impact, thud, crash };
     // 残響生成はiOSで遅延しうるため、最大2.5秒で見切る（未完成時はドライで開始し後から効く）
     try { await Promise.race([verb.ready, new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
     Tone.Transport.bpm.value = 100;
@@ -827,17 +833,17 @@ export default function TankenInfinity() {
     const t = time ?? undefined;
     try {
       if (kind === "hit") {
-        // 打撃：擦過音と芯を重ねる。毎回わずかに音程を散らして単調にしない
+        // 打撃：クラッシュシンバルに厚みと芯を重ねる。芯は毎回わずかに音程を散らす
         const p = 38 + Math.floor(Math.random() * 5);        // 概ねD1〜F#1
-        a.impact?.triggerAttackRelease("32n", t, 0.85);
+        a.crash?.triggerAttackRelease("4n", t, 0.9);
+        a.impact?.triggerAttackRelease("8n", t, 0.6);
         a.thud?.triggerAttackRelease(Tone.Frequency(p, "midi"), "16n", t, 0.9);
-        a.fx.triggerAttackRelease("G2", "32n", t, 0.5);
       }
       else if (kind === "hurt") {
         // 被弾：より低く、尾を引く。短二度をぶつけて痛みの色をつける
         const p = 26 + Math.floor(Math.random() * 4);
         a.thud?.triggerAttackRelease(Tone.Frequency(p, "midi"), "8n", t, 1);
-        a.impact?.triggerAttackRelease("16n", t, 0.55);
+        a.impact?.triggerAttackRelease("16n", t, 0.35);
         a.fx.triggerAttackRelease("C2", "16n", t, 0.7);
         try { a.fx.triggerAttackRelease("C#2", "32n", (t ?? Tone.now()) + 0.045, 0.5); } catch (e) {}
       }

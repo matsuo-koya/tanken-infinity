@@ -10,25 +10,38 @@ import * as Tone from "/node_modules/tone/build/esm/index.js";
 function build() {
   const out = new Tone.Gain(0.85).toDestination();
   const impBP = new Tone.Filter({ type: "bandpass", frequency: 1900, Q: 1.1 }).connect(out);
-  const impact = new Tone.NoiseSynth({ noise:{type:"white"}, volume:-8,
+  const snare = new Tone.NoiseSynth({ noise:{type:"white"}, volume:-9,
     envelope:{attack:0.001, decay:0.11, sustain:0} }).connect(impBP);
+  const crashHP = new Tone.Filter({ type:"highpass", frequency:3800 }).connect(out);
+  const crash = new Tone.MetalSynth({ harmonicity:5.1, modulationIndex:32, resonance:4200,
+    octaves:1.5, envelope:{attack:0.001, decay:1.1, release:0.3}, volume:-22 }).connect(crashHP);
+  const impact = new Tone.NoiseSynth({ noise:{type:"white"}, volume:-16,
+    envelope:{attack:0.001, decay:0.7, sustain:0, release:0.25} }).connect(crashHP);
   const thud = new Tone.MembraneSynth({ octaves:4, pitchDecay:0.09, volume:-5,
     envelope:{attack:0.001, decay:0.24, sustain:0, release:0.05} }).connect(out);
   const fx = new Tone.Synth({ oscillator:{type:"square"}, volume:-14,
     envelope:{attack:0.001, decay:0.08, sustain:0, release:0.05} }).connect(out);
-  return { impact, thud, fx };
+  return { impact, thud, fx, snare, crash };
 }
 
 const render = (kind) => Tone.Offline(() => {
   const a = build();
   const t = 0.05;
   if (kind === "hit") {
-    a.impact.triggerAttackRelease("32n", t, 0.85);
+    a.crash.triggerAttackRelease("4n", t, 0.9);
+    a.impact.triggerAttackRelease("8n", t, 0.6);
+    a.thud.triggerAttackRelease(Tone.Frequency(40, "midi"), "16n", t, 0.9);
+  } else if (kind === "crash-only") {
+    a.crash.triggerAttackRelease("4n", t, 0.9);
+  } else if (kind === "noise-only") {
+    a.impact.triggerAttackRelease("8n", t, 0.6);
+  } else if (kind === "snare-hit") {
+    a.snare.triggerAttackRelease("32n", t, 0.85);
     a.thud.triggerAttackRelease(Tone.Frequency(40, "midi"), "16n", t, 0.9);
     a.fx.triggerAttackRelease("G2", "32n", t, 0.5);
   } else if (kind === "hurt") {
     a.thud.triggerAttackRelease(Tone.Frequency(27, "midi"), "8n", t, 1);
-    a.impact.triggerAttackRelease("16n", t, 0.55);
+    a.impact.triggerAttackRelease("16n", t, 0.35);
     a.fx.triggerAttackRelease("C2", "16n", t, 0.7);
     a.fx.triggerAttackRelease("C#2", "32n", t + 0.045, 0.5);
   } else if (kind === "old-hit") {           // 改修前：矩形波ひとつだけ
@@ -36,11 +49,11 @@ const render = (kind) => Tone.Offline(() => {
   } else if (kind === "old-hurt") {
     a.fx.triggerAttackRelease("C2", "16n", t, 0.8);
   }
-}, 1.0);
+}, 2.0);
 
 const lines = [];
 const waves = document.getElementById("waves");
-for (const kind of ["old-hit", "hit", "old-hurt", "hurt"]) {
+for (const kind of ["crash-only", "noise-only", "snare-hit", "hit", "hurt"]) {
   const buf = await render(kind);
   const d = buf.getChannelData(0);
   let peak = 0, sum = 0, tail = 0;
