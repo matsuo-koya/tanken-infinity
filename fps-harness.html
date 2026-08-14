@@ -35,11 +35,13 @@ const mkWorld = (o={}) => ({
 
 const cache = {};
 const shots = [
-  ["東を向く（門と敵、奥に階段）", mkWorld(), 0, 0],
-  ["相棒の犬が目の前に",           mkWorld({buddy:{em:"🐕",kj:"犬"}}), 0, 0],
-  ["蝠が間近（血の翳り）",         mkWorld({dog:{x:12,y:7,head:0,em:"🚶",kj:"人",name:"人"}}), 0, 1200],
-  ["北を向く（壁のテクスチャ）",   mkWorld({dog:{x:6,y:8,head:-Math.PI/2,em:"🚶",kj:"人",name:"人"}}), 0, 0],
-  ["斜め（歪みの確認）",           mkWorld({dog:{x:5,y:9,head:-Math.PI/4,em:"🚶",kj:"人",name:"人"}}), 0, 0],
+  ["人が先頭：両手が前に",       mkWorld(), 0, 0],
+  ["人＋相棒の犬（上半身）",     mkWorld({buddy:{em:"🐕",kj:"犬"}}), 0, 0],
+  ["犬が先頭：鼻先が覗く",       mkWorld({dog:{x:4,y:7,head:0,em:"🐕",kj:"犬",name:"犬"}}), 0, 600],
+  ["猫が先頭：鼻先が覗く",       mkWorld({dog:{x:4,y:7,head:0,em:"🐈",kj:"猫",name:"猫"}}), 0, 600],
+  ["相棒が左へ流れる",           mkWorld({buddy:{em:"🐕",kj:"犬"}}), 0, 2600],
+  ["蝠が間近（血の翳り）",       mkWorld({dog:{x:12,y:7,head:0,em:"🚶",kj:"人",name:"人"}}), 0, 1200],
+  ["地下への口（🕳️）",           mkWorld({dog:{x:16,y:7,head:0,em:"🚶",kj:"人",name:"人"}}), 0, 0],
 ];
 
 const root = document.getElementById("root");

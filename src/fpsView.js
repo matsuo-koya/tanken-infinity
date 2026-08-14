@@ -3,6 +3,8 @@
    本体とハーネスの両方から同じものを呼べるよう、refに依存せず引数で受け取る。 */
 
 export const FOV = Math.PI / 3;
+// 主自身が覗くときは全身像ではなく顔の絵文字を使う（下端から出るのは顔であってほしい）
+const FACES = { "犬": "🐶", "猫": "🐱" };
 const TILE = 96;
 const WALL_H = 2.2;   // 壁の高さ（区画の一辺を1とする）。低いと這うような画になる
 const EYE = 0.85;     // 視点の高さ。壁の半分より低くして、床と敵が正面に来るようにする
@@ -37,6 +39,62 @@ export function stepCam(cam, world, dt) {
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
   cam.ang += d * k;
+}
+
+/* 視点の主の身体。世界ではなく画面に貼るので、遠近には従わせない。
+   画面の下端から一部だけを覗かせることで「そこに居る」感じを出す。 */
+function drawBody(ctx, cw, chh, w, now) {
+  const t = now / 1000;
+  const gait = Math.sin(t * 3.4);          // 歩みの上下動
+  const drift = Math.sin(t * 0.83);        // ゆっくりした左右の揺れ
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+
+  // 連れの相棒。全身は見せず、手前を横切る上半身だけ
+  if (w.buddy) {
+    const size = chh * 0.82;
+    const x = cw * 0.5 + Math.sin(t * 0.62) * cw * 0.46;
+    const y = chh + size * 0.30 - Math.abs(Math.sin(t * 3.1)) * size * 0.05;
+    const toRight = Math.cos(t * 0.62) > 0;
+    ctx.save();
+    ctx.globalAlpha = 0.96;
+    ctx.shadowColor = "#c8b78a"; ctx.shadowBlur = size * 0.14;
+    ctx.font = `${size}px 'Hiragino Mincho ProN',serif`;
+    ctx.translate(x, y);
+    if (toRight) ctx.scale(-1, 1);         // 進む向きへ顔を向ける
+    ctx.fillText(w.buddy.em, 0, 0);
+    ctx.restore();
+  }
+
+  // 主自身。人なら両手が前に、獣なら鼻先が時折覗く
+  if (w.dog.kj === "人") {
+    const size = chh * 0.46;
+    const y = chh + size * 0.30 - Math.abs(gait) * size * 0.07;
+    ctx.save();
+    ctx.font = `${size}px serif`;
+    ctx.globalAlpha = 0.95;
+    for (const [px, rot, mirror] of [[0.2, -0.22, true], [0.8, 0.22, false]]) {
+      ctx.save();
+      ctx.translate(cw * px + drift * cw * 0.015, y + (mirror ? gait : -gait) * size * 0.05);
+      ctx.rotate(rot);
+      if (mirror) ctx.scale(-1, 1);
+      ctx.fillText("🤚", 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+  } else {
+    // 獣：ゆっくりした周期で鼻面が下から せり上がっては沈む
+    const peek = Math.sin(((t * 0.14) % 1) * Math.PI * 2);
+    if (peek > 0) {
+      const size = chh * 0.62;
+      const y = chh + size * 0.34 - peek * size * 0.28;   // せり上がると顔の上半分まで見える
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.font = `${size}px serif`;
+      ctx.translate(cw * (0.5 + drift * 0.1), y);
+      ctx.fillText(FACES[w.dog.kj] || w.dog.em, 0, 0);
+      ctx.restore();
+    }
+  }
 }
 
 /* env: { world, cam, cache, W, H, ITEM_TYPES, now } */
@@ -116,7 +174,7 @@ export function drawFPS(ctx, cw, chh, env) {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (w.map[y][x] === "door" && seen(x, y)) sprites.push({ x: x + 0.5, y: y + 0.5, ch: "門", color: "#a08b56", sc: 1.7 });
   }
-  if (seen(w.stairs.x, w.stairs.y)) sprites.push({ x: w.stairs.x + 0.5, y: w.stairs.y + 0.5, ch: "🪜", color: "#8d7bb5", sc: 1.0 });
+  if (seen(w.stairs.x, w.stairs.y)) sprites.push({ x: w.stairs.x + 0.5, y: w.stairs.y + 0.5, ch: "🕳️", color: "#8d7bb5", sc: 1.0 });
   for (const it of w.items) if (seen(it.x, it.y))
     sprites.push({ x: it.x + 0.5, y: it.y + 0.5, ch: ITEM_TYPES[it.type].e, color: "#c8963e", sc: 0.5 });
 
@@ -139,21 +197,6 @@ export function drawFPS(ctx, cw, chh, env) {
     sprites.push({
       x: ex, y: ey, ch: e.alerted ? e.e : e.k,
       color: e.alerted ? "#d9553f" : "#b3a486", sc, lift, flip, glow: e.alerted,
-    });
-  }
-
-  // 相棒は目の前をうろちょろさせる（実座標では背後にいて映らないため）
-  if (w.buddy) {
-    const t = now / 1000;
-    const fwd = 2.45 + Math.sin(t * 2.3) * 0.35;
-    const lat = Math.sin(t * 1.31) * 0.75;
-    const latVel = Math.cos(t * 1.31);              // 右へ流れているか左へか
-    sprites.push({
-      x: c.x + dirX * fwd - dirY * lat,
-      y: c.y + dirY * fwd + dirX * lat,
-      ch: w.buddy.em, color: "#d8cdb2", sc: 0.95,
-      lift: Math.abs(Math.sin(t * 4.2)) * 0.08, glow: true,
-      flip: latVel > 0,                             // 進む向きへ顔を向ける
     });
   }
 
@@ -184,6 +227,8 @@ export function drawFPS(ctx, cw, chh, env) {
     ctx.shadowBlur = 0;
   }
   ctx.globalAlpha = 1;
+
+  drawBody(ctx, cw, chh, w, now);
 
   // 間近に迫られると視界の縁が血の色に翳る
   if (dread > 0.01) {

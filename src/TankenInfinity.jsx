@@ -1465,7 +1465,7 @@ export default function TankenInfinity() {
       if (t === "wall") { ch = "壁"; color = "#4a4336"; }
       else if (t === "door") { ch = "門"; color = "#a08b56"; }
       else { ch = "・"; color = "#3f3a30"; }
-      if (x === wv.stairs.x && y === wv.stairs.y) { ch = flipB ? "階" : "🪜"; color = "#8d7bb5"; }
+      if (x === wv.stairs.x && y === wv.stairs.y) { ch = flipB ? "階" : "🕳️"; color = "#8d7bb5"; }
       const it = wv.items.find(i => i.x === x && i.y === y);
       if (it) { const d = ITEM_TYPES[it.type]; ch = flipB ? d.k : d.e; color = it.type === "gold" ? "#c8963e" : "#5ea67a"; }
     }
@@ -1521,8 +1521,6 @@ export default function TankenInfinity() {
   const b = battle.current;
   const ba = b.ally || (w ? { k: w.dog.kj, e: w.dog.em, name: w.dog.name, hp: w.dog.hp, maxHp: w.dog.maxHp } : null);
   const inFight = started && w && !w.dead && b.cooldown > 0 && b.foe && ba;
-  // 拡大した戦闘画は一人称のときだけ。俯瞰では盤面を隠さず、閃光で伝える
-  const showBattle = inFight && viewMode === "fps";
   // 打ち合いの瞬間だけ強く光る（攻撃・被弾のカウンタが立っている間）
   const hitPulse = inFight ? Math.max(b.dogAnim, b.foeAnim, b.dogHurt, b.foeHurt) : 0;
   const flashAlpha = inFight ? Math.min(0.5, hitPulse * 0.14) : 0;
@@ -1648,8 +1646,8 @@ export default function TankenInfinity() {
               )}
 
               {/* 戦闘拡大窓：絵文字同士の対戦 */}
-              {/* 俯瞰の戦闘：盤面を覆わず、打ち合いに合わせて閃く */}
-              {viewMode === "top" && inFight && (
+              {/* 戦闘は盤面を覆わず、打ち合いに合わせて閃かせるだけにする */}
+              {inFight && (
                 <div style={{
                   position: "absolute", inset: 0, zIndex: 3, borderRadius: 6, pointerEvents: "none",
                   boxShadow: `inset 0 0 ${28 + hitPulse * 16}px rgba(217,85,63,${(0.22 + flashAlpha).toFixed(3)})`,
@@ -1664,48 +1662,6 @@ export default function TankenInfinity() {
                 </div>
               )}
 
-              {showBattle && (
-                <div style={{
-                  position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)",
-                  zIndex: 3, background: "rgba(16,14,10,0.9)", border: "1px solid #6b3a2e",
-                  borderRadius: 10, padding: "12px 20px 12px", width: Math.min(310, W * cell - 30),
-                  boxShadow: "0 8px 40px rgba(0,0,0,0.65)", pointerEvents: "none",
-                }}>
-                  <div style={{ textAlign: "center", fontSize: 10, letterSpacing: "0.4em", color: "#d9553f", marginBottom: 4 }}>戦　闘</div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
-                    <div style={{ textAlign: "center", flex: 1 }}>
-                      <div style={{
-                        fontSize: 56, lineHeight: 1.15,
-                        transform: `translateX(${(b.dogAnim ? 16 : 0) + (b.dogHurt ? (b.dogHurt % 2 ? -6 : 6) : 0)}px) scaleX(-1)`,
-                        filter: b.dogHurt ? "drop-shadow(0 0 10px #d9553f)" : "none",
-                        transition: "transform 90ms",
-                      }}>{ba.e}</div>
-                      <div style={{ fontSize: 12, color: "#b3a486", marginTop: 2 }}>{ba.name}</div>
-                      <HpBar val={ba.hp} max={ba.maxHp} color="#5ea67a" />
-                    </div>
-                    <div style={{ fontSize: 18, color: "#655d4c", padding: "0 10px", fontWeight: 700 }}>対</div>
-                    <div style={{ textAlign: "center", flex: 1 }}>
-                      <div style={{
-                        fontSize: 56, lineHeight: 1.15,
-                        transform: `translateX(${(b.foeAnim ? -16 : 0) + (b.foeHurt ? (b.foeHurt % 2 ? 6 : -6) : 0)}px)`,
-                        filter: b.foeHurt ? "drop-shadow(0 0 10px #d9553f)" : "none",
-                        opacity: b.foe.hp <= 0 ? 0.3 : 1,
-                        transition: "transform 90ms, opacity 300ms",
-                      }}>{b.foeKO ? "💥" : b.foe.e}</div>
-                      <div style={{ fontSize: 12, color: "#b3a486", marginTop: 2 }}>{b.foe.k}</div>
-                      <HpBar val={b.foe.hp} max={b.foe.maxHp} color="#d9553f" />
-                    </div>
-                    {b.floats.map(f => (
-                      <div key={f.id} style={{
-                        position: "absolute", top: -4 - f.t * 4,
-                        [f.side === "dog" ? "left" : "right"]: "16%",
-                        color: "#d9553f", fontSize: 17, fontWeight: 700,
-                        opacity: Math.max(0, 1 - f.t / 7), textShadow: "0 1px 3px #000",
-                      }}>−{kanjiNum(f.val)}</div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* 大画面昇天：戦闘の中央で天使の輪とともに昇る */}
               {bigAscend.current && (
@@ -1833,12 +1789,6 @@ export default function TankenInfinity() {
     </div>
   );
 }
-
-const HpBar = ({ val, max, color }) => (
-  <div style={{ height: 4, background: "#26221a", borderRadius: 2, marginTop: 5, overflow: "hidden" }}>
-    <div style={{ height: "100%", width: `${Math.max(0, (val / max) * 100)}%`, background: color, transition: "width 160ms" }} />
-  </div>
-);
 
 const btnStyle = (primary) => ({
   background: primary ? "#8d7bb5" : "transparent",
