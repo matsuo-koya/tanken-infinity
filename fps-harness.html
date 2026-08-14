@@ -24,11 +24,11 @@ const mk = (x,y,head,o={}) => ({
 const beast = (o={}) => ({ dog:{x:8,y:7,head:0,em:"🐕",kj:"犬",name:"犬"}, ...o });
 const cache = {};
 const shots = [
-  ["人：左手が前",   mk(8,7,0), 462],
-  ["人：入れ替わり", mk(8,7,0), 924],
-  ["人：剣が前",     mk(8,7,0), 1386],
-  ["人＋相棒",       mk(8,7,0,{buddy:{em:"🐕",kj:"犬"}}), 1386],
-  ["人：斃れ t=4",   mk(8,7,0,{dead:true,deadTimer:4}), 462],
+  ["探索：素手が前",   mk(8,7,0), 462],
+  ["探索：剣が前",     mk(8,7,0), 1386],
+  ["戦闘：拳が前",     mk(8,7,0,{combat:true}), 462],
+  ["戦闘：剣が前",     mk(8,7,0,{combat:true}), 1386],
+  ["戦闘：入れ替わり", mk(8,7,0,{combat:true}), 924],
 ];
 const root = document.getElementById("root");
 for (const [label, world, nw] of shots) {

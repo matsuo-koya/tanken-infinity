@@ -77,9 +77,11 @@ function drawBody(ctx, cw, chh, w, now) {
     const size = chh * 0.46;
     ctx.save();
     ctx.font = `${size}px serif`;
-    // 左は素手、右は剣を握る。剣は少し大きく、切っ先が内へ向くよう寝かせる
+    // 左は素手、右は剣を握る。剣は少し大きく、切っ先が内へ向くよう寝かせる。
+    // 戦闘に入ると空いた手は拳を握る
+    const bare = (w.combat && !dead) ? "✊" : "🤚";
     const hands = [
-      [0.19, -0.22, true, 0, "🤚", 1.0],
+      [0.19, -0.22, true, 0, bare, 1.0],
       [0.80, 0.30, false, Math.PI, "🗡️", 1.3],
     ];
     for (const [px, rot, mirror, phase, glyph, mag] of hands) {
