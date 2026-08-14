@@ -67,15 +67,17 @@ function drawBody(ctx, cw, chh, w, now) {
 
   // 主自身。人なら両手が前に、獣なら鼻先が時折覗く
   if (w.dog.kj === "人") {
+    // 手は左右交互に振り出す。引いた側は下端に沈めて、歩みの拍を作る
     const size = chh * 0.46;
-    const y = chh + size * 0.30 - Math.abs(gait) * size * 0.07;
     ctx.save();
     ctx.font = `${size}px serif`;
-    ctx.globalAlpha = 0.95;
-    for (const [px, rot, mirror] of [[0.2, -0.22, true], [0.8, 0.22, false]]) {
+    for (const [px, rot, mirror, phase] of [[0.2, -0.22, true, 0], [0.8, 0.22, false, Math.PI]]) {
+      const swing = Math.sin(t * 3.4 + phase);      // 片方が前なら、もう片方は後ろ
+      const rise = (swing + 1) / 2;                 // 引いた側は下端へ沈むが、消えはしない
       ctx.save();
-      ctx.translate(cw * px + drift * cw * 0.015, y + (mirror ? gait : -gait) * size * 0.05);
-      ctx.rotate(rot);
+      ctx.globalAlpha = 0.6 + rise * 0.35;
+      ctx.translate(cw * px + drift * cw * 0.015, chh + size * 0.44 - rise * size * 0.56);
+      ctx.rotate(rot * (0.5 + rise * 0.5));
       if (mirror) ctx.scale(-1, 1);
       ctx.fillText("🤚", 0, 0);
       ctx.restore();
@@ -160,8 +162,11 @@ export function drawFPS(ctx, cw, chh, env) {
     const lh = WALL_H * k;                      // 壁の丈（床は horizon + EYE*k）
     let wallX = side === 0 ? c.y + perp * rayY : c.x + perp * rayX;
     wallX -= Math.floor(wallX);
-    // 対称な絵柄なら向きを揃える反転を入れるところだが、字は鏡文字になるので入れない
-    const texX = Math.floor(wallX * TILE);
+    // 面によって、画面を左→右と走るときのwallXの増減が逆になる。
+    // 減る側だけ反転して、字が常に正しく読める向きに揃える。
+    // （定石の反転はこれと逆向きで、字だと全面が鏡文字になる）
+    let texX = Math.floor(wallX * TILE);
+    if ((side === 0 && rayX < 0) || (side === 1 && rayY > 0)) texX = TILE - texX - 1;
     ctx.drawImage(wallTex, texX, 0, 1, TILE, sx, y0, 1, lh);
     // 距離と面の向きで翳らせる
     const shade = Math.min(0.86, perp / 13 + (side === 1 ? 0.16 : 0));
