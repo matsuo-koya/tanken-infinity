@@ -26,14 +26,14 @@ const cache = {};
 // 打撃の合図を now より前に置き、振りの各段階を切り出す
 const SW = (ms) => ({ combat:true, __sw: ms });
 const shots = [
-  ["犬：構え",          mk(8,7,0,beast({combat:true})), 3400, null],
-  ["犬：打撃 +0.03s",   mk(8,7,0,beast({combat:true})), 3400, 30],
+  ["人：探索・左手が前", mk(8,7,0), 462, null],
+  ["人：戦闘・拳が前",   mk(8,7,0,{combat:true}), 462, null],
+  ["犬：構え",           mk(8,7,0,beast({combat:true})), 3400, null],
+  ["犬：打撃 +0.03s",    mk(8,7,0,beast({combat:true})), 3400, 30],
   ["犬：打撃 +0.09s（噛）", mk(8,7,0,beast({combat:true})), 3400, 91],
-  ["犬：打撃 +0.20s",   mk(8,7,0,beast({combat:true})), 3400, 200],
-  ["犬：打撃 +0.35s",   mk(8,7,0,beast({combat:true})), 3400, 350],
-  ["犬：振り後",        mk(8,7,0,beast({combat:true})), 3400, 700],
+  ["犬：打撃 +0.20s",    mk(8,7,0,beast({combat:true})), 3400, 200],
   ["猫：打撃 +0.09s（噛）", mk(8,7,0,{dog:{x:8,y:7,head:0,em:"🐈",kj:"猫",name:"猫"},combat:true}), 3400, 91],
-  ["人：打撃 +0.09s（剣）", mk(8,7,0,{combat:true}), 1386, 91],
+  ["猫：通常の覗き",     mk(8,7,0,{dog:{x:8,y:7,head:0,em:"🐈",kj:"猫",name:"猫"}}), 3400, null],
 ];
 const root = document.getElementById("root");
 for (const [label, world, nw, swAgo] of shots) {

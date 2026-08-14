@@ -7,6 +7,10 @@ export const FOV = Math.PI / 3;
 const FACES = { "犬": "🐶", "猫": "🐱" };
 const SWORD = "🗡️";
 const SWING_MS = 480;   // 一振りにかける実時間
+// 下端から覗かせてよい割合。これを超えると目が入り、こちらを向いた顔に見えてしまう。
+// 見える高さ = 字の高さ × (0.16 + 0.28 × peek) なので、そこから上限のpeekを逆算する
+const CROWN_MAX = 0.33;
+const PEEK_MAX = (CROWN_MAX - 0.16) / 0.28;
 const SWING_TOP = 0.19; // 切先が真上に来る位置（打撃音の直後に来るよう早めに取る）
 const TILE = 96;
 const WALL_H = 2.2;   // 壁の高さ（区画の一辺を1とする）。低いと這うような画になる
@@ -85,11 +89,14 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
     ctx.font = `${size}px serif`;
     // 左は素手、右は剣を握る。剣は少し大きく、切っ先が内へ向くよう寝かせる。
     // 戦闘に入ると空いた手は拳を握る
-    const bare = (w.combat && !dead) ? "✊" : "🤚";
+    const fighting = w.combat && !dead;
+    const bare = fighting ? "✊" : "🤚";
+    // 探索中の素手は指先を左上へ向ける。握った拳は立てたまま
+    const bareBase = fighting ? -0.11 : 0.38;
     // [横位置, 基準の傾き, 振り出しでの追加の傾き, 左右反転, 位相, 字, 倍率]
     // 剣は素の絵文字だと切先が左下を向くので、半回転させて右上へ構える
     const hands = [
-      [0.19, -0.11, -0.11, true, 0, bare, 1.0],
+      [0.19, bareBase, -0.11, true, 0, bare, 1.0],
       [0.72, Math.PI, 0.13, false, Math.PI, SWORD, 1.3],
     ];
     for (const [px, base, lean, mirror, phase, glyph, mag] of hands) {
@@ -128,18 +135,20 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
   } else {
     // 獣：ゆっくりした周期で鼻面が下から せり上がっては沈む。
     // 斃れた後は周期を止め、うなだれるように一度だけ沈む
-    let peek = dead ? 0.95 * (1 - fall) : Math.sin(((t * 0.14) % 1) * Math.PI * 2);
+    let peek = dead ? 0.95 * (1 - fall) : Math.sin(((t * 0.14) % 1) * Math.PI * 2) * 0.62;
     let mag = 1, lean = 0;
     if (swinging) {
-      // 一撃：剣の代わりに、跳ね上がって噛みつき、そのまま落ちる。
-      // 頂点は剣が真上を向くのと同じ位置に取り、打撃音と噛みつきを合わせる
+      // 一撃：剣の代わりに跳ね上がって噛みつく。頂点は剣が真上を向くのと同じ位置に
+      // 取り、打撃音と噛みつきを合わせる。ただし見せるのは頭頂部から後頭部までで、
+      // 目まで出すと敵ではなくこちらを向いていることになる。迫りは拡大で表す。
       const up = sp < SWING_TOP
         ? 1 - (1 - sp / SWING_TOP) ** 2                        // ぱっと跳ぶ
         : 1 - ((sp - SWING_TOP) / (1 - SWING_TOP)) ** 1.5;     // 落ちる
-      peek = Math.max(peek, up * 2.4);                         // 顔ごと視界へ入る
-      mag = 1 + up * 0.45;                                     // 前へ食らいつく
-      lean = up * 0.22;                                        // 食らいつく首の角度
+      peek = Math.max(peek, 0.1 + up * 0.55);                  // わずかに上へ
+      mag = 1 + up * 1.15;                                     // 大きく迫る
+      lean = up * 0.16;                                        // 食らいつく首の角度
     }
+    peek = Math.min(peek, PEEK_MAX);                           // 目より下は見せない
     if (peek > 0) {
       const size = chh * 0.62 * mag;
       const y = chh + size * 0.34 - peek * size * 0.28;   // せり上がると顔の上半分まで見える
