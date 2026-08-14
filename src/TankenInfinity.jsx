@@ -668,7 +668,18 @@ export default function TankenInfinity() {
       envelope: { attack: 0.005, decay: 0.15, sustain: 0.15, release: 0.2 } }).connect(delay);
     const fx = new Tone.Synth({ oscillator: { type: "square" }, volume: -14,
       envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 } }).connect(filt);
-    audio.current = { out, filt, dist, kick, hat, bass, lead, fx, verb, delay, chorus, strings, organ };
+    // 打撃系は専用の声を立てる。旋律用のフィルタを通すとHP低下時にこもって
+    // 聞こえなくなるので、出力へ直に挿す（語りのダッキングは効いたまま）
+    const impBP = new Tone.Filter({ type: "bandpass", frequency: 1900, Q: 1.1 }).connect(out);
+    const impact = new Tone.NoiseSynth({           // 当たりの擦過音
+      noise: { type: "white" }, volume: -9,
+      envelope: { attack: 0.001, decay: 0.11, sustain: 0 },
+    }).connect(impBP);
+    const thud = new Tone.MembraneSynth({          // 体に響く芯
+      octaves: 4, pitchDecay: 0.09, volume: -7,
+      envelope: { attack: 0.001, decay: 0.24, sustain: 0, release: 0.05 },
+    }).connect(out);
+    audio.current = { out, filt, dist, kick, hat, bass, lead, fx, verb, delay, chorus, strings, organ, impact, thud };
     // 残響生成はiOSで遅延しうるため、最大2.5秒で見切る（未完成時はドライで開始し後から効く）
     try { await Promise.race([verb.ready, new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
     Tone.Transport.bpm.value = 100;
@@ -815,13 +826,26 @@ export default function TankenInfinity() {
     const a = audio.current; if (!a) return;
     const t = time ?? undefined;
     try {
-      if (kind === "hit") a.fx.triggerAttackRelease("G2", "32n", t, 0.7);
+      if (kind === "hit") {
+        // 打撃：擦過音と芯を重ねる。毎回わずかに音程を散らして単調にしない
+        const p = 38 + Math.floor(Math.random() * 5);        // 概ねD1〜F#1
+        a.impact?.triggerAttackRelease("32n", t, 0.85);
+        a.thud?.triggerAttackRelease(Tone.Frequency(p, "midi"), "16n", t, 0.9);
+        a.fx.triggerAttackRelease("G2", "32n", t, 0.5);
+      }
+      else if (kind === "hurt") {
+        // 被弾：より低く、尾を引く。短二度をぶつけて痛みの色をつける
+        const p = 26 + Math.floor(Math.random() * 4);
+        a.thud?.triggerAttackRelease(Tone.Frequency(p, "midi"), "8n", t, 1);
+        a.impact?.triggerAttackRelease("16n", t, 0.55);
+        a.fx.triggerAttackRelease("C2", "16n", t, 0.7);
+        try { a.fx.triggerAttackRelease("C#2", "32n", (t ?? Tone.now()) + 0.045, 0.5); } catch (e) {}
+      }
       else if (kind === "kill") a.fx.triggerAttackRelease("C4", "16n", t, 0.6);
       else if (kind === "eat") a.fx.triggerAttackRelease("E5", "16n", t, 0.4);
       else if (kind === "gold") a.fx.triggerAttackRelease("A5", "32n", t, 0.5);
       else if (kind === "stairs") a.fx.triggerAttackRelease("C6", "8n", t, 0.5);
       else if (kind === "ascend") { a.fx.triggerAttackRelease("E6", "8n", t, 0.4); a.strings?.triggerAttackRelease(["A5", "E6"], "2n", t, 0.25); }
-      else if (kind === "hurt") a.fx.triggerAttackRelease("C2", "16n", t, 0.8);
     } catch (e) { /* timing races are non-fatal */ }
   }
 

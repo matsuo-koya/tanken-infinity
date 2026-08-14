@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="UTF-8"><title>SFX harness</title>
+<style>body{margin:0;background:#14120e;color:#b3a486;font-family:monospace;padding:16px}
+pre{font-size:14px;line-height:1.7}canvas{display:block;margin:6px 0 14px;background:#1a1712;border:1px solid #322d22}</style>
+</head><body><pre id="out">rendering…</pre><div id="waves"></div>
+<script type="module">
+import * as Tone from "/node_modules/tone/build/esm/index.js";
+
+// 本体と同じ組み方で打撃系の声を作り、オフラインで実際に鳴らして波形を測る
+function build() {
+  const out = new Tone.Gain(0.85).toDestination();
+  const impBP = new Tone.Filter({ type: "bandpass", frequency: 1900, Q: 1.1 }).connect(out);
+  const impact = new Tone.NoiseSynth({ noise:{type:"white"}, volume:-8,
+    envelope:{attack:0.001, decay:0.11, sustain:0} }).connect(impBP);
+  const thud = new Tone.MembraneSynth({ octaves:4, pitchDecay:0.09, volume:-5,
+    envelope:{attack:0.001, decay:0.24, sustain:0, release:0.05} }).connect(out);
+  const fx = new Tone.Synth({ oscillator:{type:"square"}, volume:-14,
+    envelope:{attack:0.001, decay:0.08, sustain:0, release:0.05} }).connect(out);
+  return { impact, thud, fx };
+}
+
+const render = (kind) => Tone.Offline(() => {
+  const a = build();
+  const t = 0.05;
+  if (kind === "hit") {
+    a.impact.triggerAttackRelease("32n", t, 0.85);
+    a.thud.triggerAttackRelease(Tone.Frequency(40, "midi"), "16n", t, 0.9);
+    a.fx.triggerAttackRelease("G2", "32n", t, 0.5);
+  } else if (kind === "hurt") {
+    a.thud.triggerAttackRelease(Tone.Frequency(27, "midi"), "8n", t, 1);
+    a.impact.triggerAttackRelease("16n", t, 0.55);
+    a.fx.triggerAttackRelease("C2", "16n", t, 0.7);
+    a.fx.triggerAttackRelease("C#2", "32n", t + 0.045, 0.5);
+  } else if (kind === "old-hit") {           // 改修前：矩形波ひとつだけ
+    a.fx.triggerAttackRelease("G2", "32n", t, 0.7);
+  } else if (kind === "old-hurt") {
+    a.fx.triggerAttackRelease("C2", "16n", t, 0.8);
+  }
+}, 1.0);
+
+const lines = [];
+const waves = document.getElementById("waves");
+for (const kind of ["old-hit", "hit", "old-hurt", "hurt"]) {
+  const buf = await render(kind);
+  const d = buf.getChannelData(0);
+  let peak = 0, sum = 0, tail = 0;
+  for (let i = 0; i < d.length; i++) {
+    const v = Math.abs(d[i]);
+    if (v > peak) peak = v;
+    sum += d[i]*d[i];
+    if (v > 0.002) tail = i;
+  }
+  const rms = Math.sqrt(sum / d.length);
+  lines.push(`${kind.padEnd(9)} ピーク ${peak.toFixed(4)}  実効値 ${rms.toFixed(5)}  鳴り終わり ${(tail/buf.sampleRate*1000).toFixed(0)}ms`);
+  // 波形
+  const cv = document.createElement("canvas");
+  cv.width = 900; cv.height = 70;
+  const g = cv.getContext("2d");
+  g.strokeStyle = kind.startsWith("old") ? "#655d4c" : "#d9553f"; g.beginPath();
+  const N = Math.floor(buf.sampleRate * 0.5);
+  for (let x = 0; x < cv.width; x++) {
+    const i = Math.floor(x / cv.width * N);
+    g.lineTo(x, 35 - d[i] * 33);
+  }
+  g.stroke();
+  g.fillStyle = "#8f8672"; g.font = "12px monospace"; g.fillText(kind, 6, 14);
+  waves.appendChild(cv);
+}
+document.getElementById("out").textContent = lines.join("\n");
+document.title = "sfx done";
+</script></body></html>

@@ -77,7 +77,12 @@ function drawBody(ctx, cw, chh, w, now) {
     const size = chh * 0.46;
     ctx.save();
     ctx.font = `${size}px serif`;
-    for (const [px, rot, mirror, phase] of [[0.2, -0.22, true, 0], [0.8, 0.22, false, Math.PI]]) {
+    // 左は素手、右は剣を握る。剣は少し大きく、切っ先が内へ向くよう寝かせる
+    const hands = [
+      [0.19, -0.22, true, 0, "🤚", 1.0],
+      [0.80, 0.30, false, Math.PI, "🗡️", 1.3],
+    ];
+    for (const [px, rot, mirror, phase, glyph, mag] of hands) {
       const swing = Math.sin(t * 3.4 + phase);      // 片方が前なら、もう片方は後ろ
       // 生きている間は交互に振り、斃れたら振らずに両手とも落ちていく
       const rise = dead ? 0.5 * (1 - fall) : (swing + 1) / 2;
@@ -86,7 +91,9 @@ function drawBody(ctx, cw, chh, w, now) {
       ctx.translate(cw * px + drift * cw * 0.015, chh + size * 0.44 - rise * size * 0.56);
       ctx.rotate(rot * (0.5 + rise * 0.5) + (mirror ? -tilt : tilt));   // 力が抜けて外へ開く
       if (mirror) ctx.scale(-1, 1);
-      ctx.fillText("🤚", 0, 0);
+      if (mag !== 1) ctx.font = `${size * mag}px serif`;
+      ctx.fillText(glyph, 0, 0);
+      if (mag !== 1) ctx.font = `${size}px serif`;
       ctx.restore();
     }
     ctx.restore();
