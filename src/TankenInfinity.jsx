@@ -1520,7 +1520,12 @@ export default function TankenInfinity() {
   const logColors = { sys: "#8f8672", fight: "#d9553f", item: "#c8963e", dev: "#8d7bb5" };
   const b = battle.current;
   const ba = b.ally || (w ? { k: w.dog.kj, e: w.dog.em, name: w.dog.name, hp: w.dog.hp, maxHp: w.dog.maxHp } : null);
-  const showBattle = started && w && !w.dead && b.cooldown > 0 && b.foe && ba;
+  const inFight = started && w && !w.dead && b.cooldown > 0 && b.foe && ba;
+  // 拡大した戦闘画は一人称のときだけ。俯瞰では盤面を隠さず、閃光で伝える
+  const showBattle = inFight && viewMode === "fps";
+  // 打ち合いの瞬間だけ強く光る（攻撃・被弾のカウンタが立っている間）
+  const hitPulse = inFight ? Math.max(b.dogAnim, b.foeAnim, b.dogHurt, b.foeHurt) : 0;
+  const flashAlpha = inFight ? Math.min(0.5, hitPulse * 0.14) : 0;
   const narrAge = Date.now() - narr.current.at;
   const narrOpacity = Math.max(0, Math.min(0.95, (6500 - narrAge) / 1600));
 
@@ -1643,6 +1648,22 @@ export default function TankenInfinity() {
               )}
 
               {/* 戦闘拡大窓：絵文字同士の対戦 */}
+              {/* 俯瞰の戦闘：盤面を覆わず、打ち合いに合わせて閃く */}
+              {viewMode === "top" && inFight && (
+                <div style={{
+                  position: "absolute", inset: 0, zIndex: 3, borderRadius: 6, pointerEvents: "none",
+                  boxShadow: `inset 0 0 ${28 + hitPulse * 16}px rgba(217,85,63,${(0.22 + flashAlpha).toFixed(3)})`,
+                  background: flashAlpha > 0.01 ? `rgba(217,85,63,${(flashAlpha * 0.42).toFixed(3)})` : "transparent",
+                  transition: "background 70ms linear, box-shadow 90ms linear",
+                }}>
+                  <div style={{
+                    position: "absolute", left: 0, right: 0, top: 6, textAlign: "center",
+                    fontSize: 10, letterSpacing: "0.4em", color: "#d9553f",
+                    opacity: 0.55 + Math.min(0.45, hitPulse * 0.16),
+                  }}>戦　闘</div>
+                </div>
+              )}
+
               {showBattle && (
                 <div style={{
                   position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)",
@@ -1693,12 +1714,19 @@ export default function TankenInfinity() {
                   zIndex: 6, pointerEvents: "none", textAlign: "center",
                   opacity: Math.max(0, 1 - bigAscend.current.t / 16),
                 }}>
-                  <div style={{ transform: `translateY(${-bigAscend.current.t * 7}px)`, transition: "transform 150ms linear" }}>
+                  {/* 昇る本人を大きく映す。上るほど膨らみ、光に溶けていく */}
+                  <div style={{
+                    transform: `translateY(${-bigAscend.current.t * 7}px) scale(${(1 + bigAscend.current.t * 0.085).toFixed(3)})`,
+                    transition: "transform 150ms linear",
+                  }}>
                     <div style={{
-                      width: 36, height: 13, border: "3px solid #c8963e", borderRadius: "50%",
-                      margin: "0 auto 3px", boxShadow: "0 0 16px #c8963e",
+                      width: 44, height: 16, border: "3px solid #c8963e", borderRadius: "50%",
+                      margin: "0 auto 4px", boxShadow: "0 0 22px #c8963e",
                     }} />
-                    <div style={{ fontSize: 72, lineHeight: 1.1, filter: "drop-shadow(0 0 18px #c8963e)" }}>
+                    <div style={{
+                      fontSize: 108, lineHeight: 1.1,
+                      filter: `drop-shadow(0 0 ${18 + bigAscend.current.t * 2.4}px #c8963e)`,
+                    }}>
                       {bigAscend.current.em}
                     </div>
                     <div style={{ fontSize: 12, color: "#c8963e", letterSpacing: "0.35em", marginTop: 8 }}>

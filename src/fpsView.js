@@ -102,8 +102,8 @@ export function drawFPS(ctx, cw, chh, env) {
     const lh = WALL_H * k;                      // 壁の丈（床は horizon + EYE*k）
     let wallX = side === 0 ? c.y + perp * rayY : c.x + perp * rayX;
     wallX -= Math.floor(wallX);
-    let texX = Math.floor(wallX * TILE);
-    if ((side === 0 && rayX > 0) || (side === 1 && rayY < 0)) texX = TILE - texX - 1;
+    // 対称な絵柄なら向きを揃える反転を入れるところだが、字は鏡文字になるので入れない
+    const texX = Math.floor(wallX * TILE);
     ctx.drawImage(wallTex, texX, 0, 1, TILE, sx, y0, 1, lh);
     // 距離と面の向きで翳らせる
     const shade = Math.min(0.86, perp / 13 + (side === 1 ? 0.16 : 0));
@@ -124,20 +124,21 @@ export function drawFPS(ctx, cw, chh, env) {
   for (const e of w.enemies) {
     const dist = Math.hypot(e.x - w.dog.x, e.y - w.dog.y);
     if (!(seen(e.x, e.y) && (e.alerted || dist <= 5.5))) continue;
-    let ex = e.x + 0.5, ey = e.y + 0.5, sc = 1.25, lift = 0;
+    let ex = e.x + 0.5, ey = e.y + 0.5, sc = 1.25, lift = 0, flip = false;
     if (e.alerted) {
       // 気づかれたら、左右に振れながら跳ねて迫る（見せ方だけで、盤面の位置は動かさない）
       const t = now / 1000, ph = e.id * 1.7;
       const amp = Math.max(0, 0.44 - dist * 0.05);      // 近いほど大きく振れる
       const sway = Math.sin(t * 3.1 + ph) * amp;
       ex += -dirY * sway; ey += dirX * sway;            // 視線に直交する向きへ
+      flip = Math.cos(t * 3.1 + ph) > 0;                // 流れる向きへ顔を向ける
       lift = Math.abs(Math.sin(t * 5.5 + ph)) * 0.09;    // 跳ねる
       sc += Math.sin(t * 6.2 + ph) * 0.05;              // 脈打つ
       dread = Math.max(dread, Math.max(0, 1 - dist / 4));
     }
     sprites.push({
       x: ex, y: ey, ch: e.alerted ? e.e : e.k,
-      color: e.alerted ? "#d9553f" : "#b3a486", sc, lift, glow: e.alerted,
+      color: e.alerted ? "#d9553f" : "#b3a486", sc, lift, flip, glow: e.alerted,
     });
   }
 
@@ -146,11 +147,13 @@ export function drawFPS(ctx, cw, chh, env) {
     const t = now / 1000;
     const fwd = 2.45 + Math.sin(t * 2.3) * 0.35;
     const lat = Math.sin(t * 1.31) * 0.75;
+    const latVel = Math.cos(t * 1.31);              // 右へ流れているか左へか
     sprites.push({
       x: c.x + dirX * fwd - dirY * lat,
       y: c.y + dirY * fwd + dirX * lat,
       ch: w.buddy.em, color: "#d8cdb2", sc: 0.95,
       lift: Math.abs(Math.sin(t * 4.2)) * 0.08, glow: true,
+      flip: latVel > 0,                             // 進む向きへ顔を向ける
     });
   }
 
@@ -173,7 +176,11 @@ export function drawFPS(ctx, cw, chh, env) {
     ctx.font = `${size}px 'Hiragino Mincho ProN','Yu Mincho',serif`;
     if (p.s.glow) { ctx.shadowColor = p.s.color; ctx.shadowBlur = size * 0.28; }
     ctx.fillStyle = p.s.color;
-    ctx.fillText(p.s.ch, screenX, baseY - size * 0.5);   // 足元を床に付ける
+    const gy = baseY - size * 0.5;                       // 足元を床に付ける
+    if (p.s.flip) {
+      ctx.save(); ctx.translate(screenX, gy); ctx.scale(-1, 1);
+      ctx.fillText(p.s.ch, 0, 0); ctx.restore();
+    } else ctx.fillText(p.s.ch, screenX, gy);
     ctx.shadowBlur = 0;
   }
   ctx.globalAlpha = 1;
