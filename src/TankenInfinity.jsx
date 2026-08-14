@@ -918,6 +918,7 @@ export default function TankenInfinity() {
       b.ally = allySnap(dog);
       b.foe = { k: adj.k, e: adj.e, hp: Math.max(0, adj.hp), maxHp: adj.maxHp };
       b.dogAnim = 2; b.foeHurt = 2; b.cooldown = 7;
+      b.swingAt = Date.now();   // 一人称の剣を振る合図（描画は実時刻で進める）
       b.floats.push({ side: "foe", val: dmg, t: 0, id: Math.random() });
       if (adj.hp <= 0) {
         w.enemies = w.enemies.filter(e => e !== adj);
@@ -1169,6 +1170,7 @@ export default function TankenInfinity() {
   // 描画本体はfpsView.jsに置いた（確認用ハーネスと同じものを呼ぶため）
   const drawFPS = (ctx, cw, chh) => drawFPSRaw(ctx, cw, chh, {
     world: world.current, cam: cam.current, cache: tiles.current, W, H, ITEM_TYPES,
+    swingAt: battle.current.swingAt,
   });
   const stepCam = (dt) => stepCamRaw(cam.current, world.current, dt);
 

@@ -5,6 +5,8 @@
 export const FOV = Math.PI / 3;
 // 主自身が覗くときは全身像ではなく顔の絵文字を使う（下端から出るのは顔であってほしい）
 const FACES = { "犬": "🐶", "猫": "🐱" };
+const SWORD = "🗡️";
+const SWING_MS = 560;   // 一振りにかける実時間
 const TILE = 96;
 const WALL_H = 2.2;   // 壁の高さ（区画の一辺を1とする）。低いと這うような画になる
 const EYE = 0.85;     // 視点の高さ。壁の半分より低くして、床と敵が正面に来るようにする
@@ -43,7 +45,7 @@ export function stepCam(cam, world, dt) {
 
 /* 視点の主の身体。世界ではなく画面に貼るので、遠近には従わせない。
    画面の下端から一部だけを覗かせることで「そこに居る」感じを出す。 */
-function drawBody(ctx, cw, chh, w, now) {
+function drawBody(ctx, cw, chh, w, now, swingAt) {
   const t = now / 1000;
   const drift = Math.sin(t * 0.83);        // ゆっくりした左右の揺れ
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -54,6 +56,9 @@ function drawBody(ctx, cw, chh, w, now) {
   if (sink >= 1) return;                   // 沈み切ったら何も出さない
   const fall = sink * sink;                // 崩れ落ちる加速（初めは緩く、やがて一気に）
   const tilt = fall * 1.05;                // 傾きながら倒れる（約60度まで）
+  // 打撃の合図からの経過。0〜1が一振り
+  const sp = (!dead && swingAt) ? (now - swingAt) / SWING_MS : 2;
+  const swinging = sp >= 0 && sp < 1;
 
   // 連れの相棒。全身は見せず、手前を横切る上半身だけ（主の最期には出さない）
   if (w.buddy && !dead) {
@@ -84,16 +89,33 @@ function drawBody(ctx, cw, chh, w, now) {
     // 剣は素の絵文字だと切先が左下を向くので、半回転させて右上へ構える
     const hands = [
       [0.19, -0.11, -0.11, true, 0, bare, 1.0],
-      [0.72, Math.PI, 0.13, false, Math.PI, "🗡️", 1.3],
+      [0.72, Math.PI, 0.13, false, Math.PI, SWORD, 1.3],
     ];
     for (const [px, base, lean, mirror, phase, glyph, mag] of hands) {
       const swing = Math.sin(t * 3.4 + phase);      // 片方が前なら、もう片方は後ろ
       // 生きている間は交互に振り、斃れたら振らずに両手とも落ちていく
-      const rise = dead ? 0.5 * (1 - fall) : (swing + 1) / 2;
+      let rise = dead ? 0.5 * (1 - fall) : (swing + 1) / 2;
+      let ang = base + lean * rise + (mirror ? -tilt : tilt);   // 斃れると力が抜けて外へ開く
+      let alpha = 0.6 + rise * 0.35;
+      if (glyph === SWORD && swinging) {
+        // 一撃：切先が真上へ立ち上がり、そのまま薙ぎ下ろして視界から消える
+        if (sp < 0.34) {
+          const u = sp / 0.34, e = u * u;                 // 溜め
+          ang = Math.PI - Math.PI * 0.25 * e;             // 右上 → 真上
+          rise = 0.55 + 0.5 * e;
+          alpha = 0.95;
+        } else {
+          const u = (sp - 0.34) / 0.66, e = u * u;        // 振り下ろし
+          ang = Math.PI * 0.75 + Math.PI * 1.0 * e;       // 真上 → 右下へ薙ぐ
+          rise = 1.05 - 1.7 * e;                          // 画面の下へ抜ける
+          alpha = Math.max(0, 0.95 - u * 1.5);            // やがて見えなくなる
+        }
+        if (alpha <= 0.01) { continue; }
+      }
       ctx.save();
-      ctx.globalAlpha = 0.6 + rise * 0.35;
+      ctx.globalAlpha = alpha;
       ctx.translate(cw * px + drift * cw * 0.015, chh + size * 0.44 - rise * size * 0.56);
-      ctx.rotate(base + lean * rise + (mirror ? -tilt : tilt));   // 斃れると力が抜けて外へ開く
+      ctx.rotate(ang);
       if (mirror) ctx.scale(-1, 1);
       if (mag !== 1) ctx.font = `${size * mag}px serif`;
       ctx.fillText(glyph, 0, 0);
@@ -253,7 +275,7 @@ export function drawFPS(ctx, cw, chh, env) {
   }
   ctx.globalAlpha = 1;
 
-  drawBody(ctx, cw, chh, w, now);
+  drawBody(ctx, cw, chh, w, now, env.swingAt);
 
   // 間近に迫られると視界の縁が血の色に翳る
   if (dread > 0.01) {
