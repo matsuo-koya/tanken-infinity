@@ -11,7 +11,8 @@ const SWING_MS = 480;   // 一振りにかける実時間
 // 見える高さ = 字の高さ × (0.16 + 0.28 × peek) なので、そこから上限のpeekを逆算する
 const CROWN_MAX = 0.33;
 const PEEK_MAX = (CROWN_MAX - 0.16) / 0.28;
-const SWING_TOP = 0.19; // 切先が真上に来る位置（打撃音の直後に来るよう早めに取る）
+const SWING_TOP = 0.19;
+const SWORD_CENTER = 0.56;  // 振っている間に剣が寄る横位置 // 切先が真上に来る位置（打撃音の直後に来るよう早めに取る）
 const TILE = 96;
 const WALL_H = 2.2;   // 壁の高さ（区画の一辺を1とする）。低いと這うような画になる
 const EYE = 0.85;     // 視点の高さ。壁の半分より低くして、床と敵が正面に来るようにする
@@ -107,25 +108,31 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
       let rise = dead ? 0.5 * (1 - fall) : (swing + 1) / 2;
       let ang = base + lean * rise + (mirror ? -tilt : tilt);   // 斃れると力が抜けて外へ開く
       let alpha = 0.6 + rise * 0.35;
+      let hx = px;
       if (glyph === SWORD && swinging) {
-        // 一撃：切先が真上へ立ち上がり、そのまま薙ぎ下ろして視界から消える
+        // 一撃：切先が真上へ立ち上がり、そのまま薙ぎ下ろして視界から消える。
+        // あわせて右端から中央へ寄せ、振りを画面の真ん中で見せる
+        let toCenter;
         if (sp < SWING_TOP) {
           // 溜めは緩急を逆にして、音と同時にぱっと立ち上がるようにする
           const u = sp / SWING_TOP, e = 1 - (1 - u) * (1 - u);
           ang = Math.PI - Math.PI * 0.25 * e;             // 右上 → 真上
           rise = 0.55 + 0.5 * e;
           alpha = 0.95;
+          toCenter = e;
         } else {
           const u = (sp - SWING_TOP) / (1 - SWING_TOP), e = u * u;   // 振り下ろし
           ang = Math.PI * 0.75 + Math.PI * 1.0 * e;       // 真上 → 右下へ薙ぐ
           rise = 1.05 - 1.7 * e;                          // 画面の下へ抜ける
           alpha = Math.max(0, 0.95 - u * 1.5);            // やがて見えなくなる
+          toCenter = 1;                                   // 薙ぐ間は中央に置いたまま
         }
+        hx = px + (SWORD_CENTER - px) * toCenter;
         if (alpha <= 0.01) { continue; }
       }
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.translate(cw * px + drift * cw * 0.015, chh + size * off - rise * size * 0.56);
+      ctx.translate(cw * hx + drift * cw * 0.015, chh + size * off - rise * size * 0.56);
       ctx.rotate(ang);
       if (mirror) ctx.scale(-1, 1);
       if (mag !== 1) ctx.font = `${size * mag}px serif`;
