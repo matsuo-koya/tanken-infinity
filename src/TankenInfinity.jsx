@@ -1408,10 +1408,11 @@ export default function TankenInfinity() {
       if (recArmRef.current) startRec(); // 予約録画：始動と同時に開始
       setStarted(true); startedRef.current = true;
       ensurePump();
-      // 冒頭の口上：この探索がどういうものかを語る
-      narrate("これは、音楽に導かれて迷宮を歩む、小さな命の記録である");
+      // 冒頭の口上：この探索がどういうものかを語る。
+      // 情景や戦闘の語りに割り込まれず、最後まで言い切らせたいので優先で流す
+      narrate("これは、音楽に導かれて迷宮を歩む、小さな命の記録である", 1);
       setTimeout(() => {
-        if (world.current && !world.current.dead) narrate("旋律への飽きが偏差を生み、偏差が歩みを深部へと誘う");
+        if (world.current && !world.current.dead) narrate("旋律への飽きが偏差を生み、偏差が歩みを深部へと誘う", 1);
       }, 7000);
     } else {
       if (typeof window !== "undefined" && "speechSynthesis" in window) loadVoices();
