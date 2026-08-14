@@ -128,15 +128,26 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
   } else {
     // 獣：ゆっくりした周期で鼻面が下から せり上がっては沈む。
     // 斃れた後は周期を止め、うなだれるように一度だけ沈む
-    const peek = dead ? 0.95 * (1 - fall) : Math.sin(((t * 0.14) % 1) * Math.PI * 2);
+    let peek = dead ? 0.95 * (1 - fall) : Math.sin(((t * 0.14) % 1) * Math.PI * 2);
+    let mag = 1, lean = 0;
+    if (swinging) {
+      // 一撃：剣の代わりに、跳ね上がって噛みつき、そのまま落ちる。
+      // 頂点は剣が真上を向くのと同じ位置に取り、打撃音と噛みつきを合わせる
+      const up = sp < SWING_TOP
+        ? 1 - (1 - sp / SWING_TOP) ** 2                        // ぱっと跳ぶ
+        : 1 - ((sp - SWING_TOP) / (1 - SWING_TOP)) ** 1.5;     // 落ちる
+      peek = Math.max(peek, up * 2.4);                         // 顔ごと視界へ入る
+      mag = 1 + up * 0.45;                                     // 前へ食らいつく
+      lean = up * 0.22;                                        // 食らいつく首の角度
+    }
     if (peek > 0) {
-      const size = chh * 0.62;
+      const size = chh * 0.62 * mag;
       const y = chh + size * 0.34 - peek * size * 0.28;   // せり上がると顔の上半分まで見える
       ctx.save();
       ctx.globalAlpha = 0.9;
       ctx.font = `${size}px serif`;
       ctx.translate(cw * (0.5 + drift * 0.1) + tilt * cw * 0.17, y);   // 傾いた側へ流れる
-      ctx.rotate(tilt);                                   // 首を傾けて崩れる
+      ctx.rotate(tilt + lean);                            // 崩れる／食らいつく首の傾き
       ctx.fillText(FACES[w.dog.kj] || w.dog.em, 0, 0);
       ctx.restore();
     }
