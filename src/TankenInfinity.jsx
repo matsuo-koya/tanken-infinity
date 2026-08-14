@@ -1162,10 +1162,11 @@ export default function TankenInfinity() {
   const fpsCanvas = useRef(null);
   const cam = useRef({ x: 0, y: 0, ang: 0, of: null });   // of=どの迷宮に対する位置か
   const tiles = useRef({});
-  const toggleView = () => {
-    const next = viewModeRef.current === "top" ? "fps" : "top";
+  const setView = (next) => {
+    if (viewModeRef.current === next) return;
     viewModeRef.current = next; setViewMode(next); render();
   };
+  const toggleView = () => setView(viewModeRef.current === "top" ? "fps" : "top");
 
   // 描画本体はfpsView.jsに置いた（確認用ハーネスと同じものを呼ぶため）
   const drawFPS = (ctx, cw, chh) => drawFPSRaw(ctx, cw, chh, {
@@ -1450,6 +1451,18 @@ export default function TankenInfinity() {
     };
     render();
   };
+
+  useEffect(() => {
+    // Vキーで視点を切り替える（refとstateの更新なので、古い実体を掴んでいても問題ない）
+    const onKey = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = e.target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
+      if (e.key === "v" || e.key === "V") { e.preventDefault(); toggleView(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     // iOS対策：バックグラウンド復帰時にAudioContextを再開する
@@ -1814,9 +1827,15 @@ export default function TankenInfinity() {
                 : <button onClick={start} style={btnStyle(true)}>▶ 再開</button>}
               <button onClick={reset} style={btnStyle(false)}>新しい迷宮</button>
               <button onClick={backToTitle} style={{ ...btnStyle(false), color: "#8d7bb5", borderColor: "#4a4336" }}>◀ 初期画面</button>
-              <button onClick={toggleView} style={{ ...btnStyle(false), color: viewMode === "fps" ? "#d9553f" : "#b3a486" }}>
-                {viewMode === "fps" ? "◈ 一人称" : "▦ 俯瞰"}
-              </button>
+              {[["top", "▦ 俯瞰"], ["fps", "◈ 一人称"]].map(([id, label]) => (
+                <button key={id} onClick={() => setView(id)} title="Vキーでも切り替わります"
+                  style={{
+                    ...btnStyle(false), padding: "8px 12px", fontSize: 12,
+                    borderColor: viewMode === id ? "#8d7bb5" : "#4a4336",
+                    color: viewMode === id ? "#e8e0cd" : "#655d4c",
+                    background: viewMode === id ? "rgba(141,123,181,0.14)" : "transparent",
+                  }}>{label}</button>
+              ))}
               <button onClick={toggleVoice} style={{ ...btnStyle(false), color: voiceOn ? "#c8963e" : "#655d4c" }}>
                 {voiceOn ? "語り 入" : "語り 切"}
               </button>

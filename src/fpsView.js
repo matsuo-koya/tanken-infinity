@@ -6,7 +6,8 @@ export const FOV = Math.PI / 3;
 // 主自身が覗くときは全身像ではなく顔の絵文字を使う（下端から出るのは顔であってほしい）
 const FACES = { "犬": "🐶", "猫": "🐱" };
 const SWORD = "🗡️";
-const SWING_MS = 560;   // 一振りにかける実時間
+const SWING_MS = 480;   // 一振りにかける実時間
+const SWING_TOP = 0.19; // 切先が真上に来る位置（打撃音の直後に来るよう早めに取る）
 const TILE = 96;
 const WALL_H = 2.2;   // 壁の高さ（区画の一辺を1とする）。低いと這うような画になる
 const EYE = 0.85;     // 視点の高さ。壁の半分より低くして、床と敵が正面に来るようにする
@@ -99,13 +100,14 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
       let alpha = 0.6 + rise * 0.35;
       if (glyph === SWORD && swinging) {
         // 一撃：切先が真上へ立ち上がり、そのまま薙ぎ下ろして視界から消える
-        if (sp < 0.34) {
-          const u = sp / 0.34, e = u * u;                 // 溜め
+        if (sp < SWING_TOP) {
+          // 溜めは緩急を逆にして、音と同時にぱっと立ち上がるようにする
+          const u = sp / SWING_TOP, e = 1 - (1 - u) * (1 - u);
           ang = Math.PI - Math.PI * 0.25 * e;             // 右上 → 真上
           rise = 0.55 + 0.5 * e;
           alpha = 0.95;
         } else {
-          const u = (sp - 0.34) / 0.66, e = u * u;        // 振り下ろし
+          const u = (sp - SWING_TOP) / (1 - SWING_TOP), e = u * u;   // 振り下ろし
           ang = Math.PI * 0.75 + Math.PI * 1.0 * e;       // 真上 → 右下へ薙ぐ
           rise = 1.05 - 1.7 * e;                          // 画面の下へ抜ける
           alpha = Math.max(0, 0.95 - u * 1.5);            // やがて見えなくなる

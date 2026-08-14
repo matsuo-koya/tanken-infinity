@@ -26,14 +26,14 @@ const cache = {};
 // 打撃の合図を now より前に置き、振りの各段階を切り出す
 const SW = (ms) => ({ combat:true, __sw: ms });
 const shots = [
-  ["振り前（構え）",   mk(8,7,0,{combat:true}), 1386, null],
-  ["打撃 +0.05s",      mk(8,7,0,{combat:true}), 1386, 50],
-  ["打撃 +0.15s（溜め）", mk(8,7,0,{combat:true}), 1386, 150],
-  ["打撃 +0.19s（真上）", mk(8,7,0,{combat:true}), 1386, 190],
-  ["打撃 +0.28s",      mk(8,7,0,{combat:true}), 1386, 280],
-  ["打撃 +0.38s",      mk(8,7,0,{combat:true}), 1386, 380],
-  ["打撃 +0.50s（消失）", mk(8,7,0,{combat:true}), 1386, 500],
-  ["振り後（戻る）",   mk(8,7,0,{combat:true}), 1386, 700],
+  ["構え",              mk(8,7,0,{combat:true}), 1386, null],
+  ["打撃 +0.03s",       mk(8,7,0,{combat:true}), 1386, 30],
+  ["打撃 +0.06s",       mk(8,7,0,{combat:true}), 1386, 60],
+  ["打撃 +0.09s（真上）", mk(8,7,0,{combat:true}), 1386, 91],
+  ["打撃 +0.18s",       mk(8,7,0,{combat:true}), 1386, 180],
+  ["打撃 +0.30s",       mk(8,7,0,{combat:true}), 1386, 300],
+  ["打撃 +0.42s（消失）", mk(8,7,0,{combat:true}), 1386, 420],
+  ["振り後",            mk(8,7,0,{combat:true}), 1386, 700],
 ];
 const root = document.getElementById("root");
 for (const [label, world, nw, swAgo] of shots) {
