@@ -97,7 +97,7 @@ function drawBody(ctx, cw, chh, w, now, swingAt) {
     // 剣は素の絵文字だと切先が左下を向くので、半回転させて右上へ構える
     const hands = [
       [0.19, bareBase, -0.11, true, 0, bare, 1.0],
-      [0.72, Math.PI, 0.13, false, Math.PI, SWORD, 1.3],
+      [0.88, Math.PI, 0.13, false, Math.PI, SWORD, 1.3],   // 切先は画面外へ出てよい
     ];
     for (const [px, base, lean, mirror, phase, glyph, mag] of hands) {
       const swing = Math.sin(t * 3.4 + phase);      // 片方が前なら、もう片方は後ろ
