@@ -39,6 +39,10 @@ const MODE_POOLS = {
 const PROG = { bach: [0, 5, 3, 4], edm: [5, 3, 0, 4] };
 const isBaroque = s => s === "bach" || s === "organ";
 
+// ゲーム1ティックあたりの16分音符の数。戦闘中は実時間でおよそ2.2〜2.7倍に伸びる
+const TICK_DIV_WALK = 2;
+const TICK_DIV_FIGHT = 6;
+
 const ENEMY_TYPES = [
   { key: "rat",  k: "鼠", e: "🐀", hp: 3,  atk: 1, minDepth: 1 },
   { key: "bat",  k: "蝠", e: "🦇", hp: 4,  atk: 1, minDepth: 1 },
@@ -432,6 +436,7 @@ export default function TankenInfinity() {
   }
   const beatFlip = useRef(false);
   const stepIdx = useRef(0);
+  const tickAcc = useRef(0);   // ゲーム進行の間引き用（音楽の刻みとは別に数える）
   const bars = useRef(0);
   const render = useCallback(() => setTick(t => t + 1), []);
 
@@ -791,8 +796,13 @@ export default function TankenInfinity() {
     }
     // 拍で字が明滅（4分音符）
     if (s % 4 === 0) beatFlip.current = !beatFlip.current;
-    // 8分音符ごとにゲーム1ティック
-    if (s % 2 === 0) gameTick(time);
+    // ゲームの歩みは音楽から切り離して間引く。戦闘中は大きく間引いて時間を
+    // 引き伸ばし、語りや戦闘の見せ場が終わる前に決着しないようにする。
+    // （戦闘では曲のBPM自体は上がるので、間引かないとかえって速くなる）
+    if (++tickAcc.current >= (combat ? TICK_DIV_FIGHT : TICK_DIV_WALK)) {
+      tickAcc.current = 0;
+      gameTick(time);
+    }
     stepIdx.current = (s + 1) % 16;
     if (stepIdx.current === 0) barUpdate();
     // HP低下でこもった音に
