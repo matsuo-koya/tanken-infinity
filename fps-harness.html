@@ -18,20 +18,20 @@ const explored = new Set();
 for (let y=0;y<H;y++) for (let x=0;x<W;x++) explored.add(y*W+x);
 const mk = (x,y,head,o={}) => ({
   depth:1, map, explored, stairs:{x:-9,y:-9}, items:[], enemies:[],
-  dog:{x,y,head,em:"🚶",kj:"人",name:"人"}, buddy:null, combat:false, dead:false, deadTimer:0,
+  dog:{x,y,head,em:"🚶",kj:"人",name:"人",hp:30,maxHp:30}, buddy:null, combat:false, dead:false, deadTimer:0,
   ...o,
 });
 const beast = (o={}) => ({ dog:{x:8,y:7,head:0,em:"🐕",kj:"犬",name:"犬"}, ...o });
 const cache = {};
 // 打撃の合図を now より前に置き、振りの各段階を切り出す
 const SW = (ms) => ({ combat:true, __sw: ms });
+const hp = (v) => ({ dog:{x:8,y:7,head:0,em:"🚶",kj:"人",name:"人",hp:v,maxHp:30} });
 const shots = [
-  ["平常（左手が前）",   mk(8,7,0), 462, null, null],
-  ["拾得 +0.00s",        mk(8,7,0), 462, null, 0],
-  ["拾得 +0.15s",        mk(8,7,0), 462, null, 150],
-  ["拾得 +0.35s",        mk(8,7,0), 462, null, 350],
-  ["拾得 +0.55s",        mk(8,7,0), 462, null, 550],
-  ["拾得 +0.75s（左手が戻る）", mk(8,7,0), 462, null, 750],
+  ["健全 30/30",  mk(8,7,0,hp(30)), 462, null, null],
+  ["11/30（危険域の手前）", mk(8,7,0,hp(11)), 462, null, null],
+  ["7/30",        mk(8,7,0,hp(7)),  462, null, null],
+  ["4/30",        mk(8,7,0,hp(4)),  462, null, null],
+  ["1/30（瀕死）", mk(8,7,0,hp(1)),  462, null, null],
 ];
 const root = document.getElementById("root");
 for (const [label, world, nw, swAgo, pkAgo] of shots) {

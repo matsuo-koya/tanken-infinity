@@ -192,8 +192,52 @@ function drawBody(ctx, cw, chh, w, now, swingAt, pickAt, pickEm) {
   }
 }
 
+/* 手負いの度合い。残りHPが35%を切ると立ち上がり、尽きる手前で最大になる */
+function dangerOf(w) {
+  const d = w?.dog;
+  if (!d || w.dead || !d.maxHp) return 0;
+  return Math.max(0, Math.min(1, (0.35 - d.hp / d.maxHp) / 0.35));
+}
+
 /* env: { world, cam, cache, W, H, ITEM_TYPES, now } */
 export function drawFPS(ctx, cw, chh, env) {
+  const danger = dangerOf(env.world);
+  if (danger <= 0.01) { drawScene(ctx, cw, chh, env); return; }
+
+  // 手負いのときは、いったん別のキャンバスに描いてから ぼかして貼る。
+  // 表示にも録画にも同じ絵が乗るよう、CSSではなくここで処理する
+  const key = "\u0000blurbuf";
+  let buf = env.cache[key];
+  if (!buf || buf.width !== cw || buf.height !== chh) {
+    buf = document.createElement("canvas");
+    buf.width = cw; buf.height = chh;
+    env.cache[key] = buf;
+  }
+  const bctx = buf.getContext("2d");
+  bctx.setTransform(1, 0, 0, 1, 0, 0);
+  bctx.clearRect(0, 0, cw, chh);
+  drawScene(bctx, cw, chh, env);
+
+  ctx.save();
+  ctx.filter = `blur(${(danger * 3.4).toFixed(2)}px)`;
+  ctx.drawImage(buf, 0, 0);
+  ctx.restore();
+
+  // 視界が狭まる。鼓動に合わせてわずかに脈打たせる
+  const now = env.now ?? Date.now();
+  const pulse = 1 + Math.sin(now / 1000 * 2.4) * 0.05 * danger;
+  const inner = chh * (0.62 - danger * 0.42) * pulse;
+  const vg = ctx.createRadialGradient(cw / 2, chh / 2, Math.max(1, inner), cw / 2, chh / 2, chh * 1.02);
+  vg.addColorStop(0, "rgba(10,8,6,0)");
+  vg.addColorStop(0.55, `rgba(10,8,6,${(danger * 0.62).toFixed(3)})`);
+  vg.addColorStop(1, `rgba(10,8,6,${(0.55 + danger * 0.45).toFixed(3)})`);
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, cw, chh);
+
+  ctx.strokeStyle = "#322d22"; ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, cw - 2, chh - 2);
+}
+
+function drawScene(ctx, cw, chh, env) {
   const { world: w, cam: c, cache, W, H, ITEM_TYPES } = env;
   if (!w) return;
   const now = env.now ?? Date.now();
