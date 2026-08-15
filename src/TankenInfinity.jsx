@@ -445,8 +445,8 @@ export default function TankenInfinity() {
   const tickAcc = useRef(0);   // ゲーム進行の間引き用（音楽の刻みとは別に数える）
   const [steer, setSteer] = useState(STEER_MAX);   // 手綱の残り
   const steerRef = useRef(STEER_MAX);
-  const steerPend = useRef(null);                  // 次の一歩に割り込む向き
-  const resetSteer = () => { steerRef.current = STEER_MAX; setSteer(STEER_MAX); steerPend.current = null; };
+  const steerHold = useRef(null);                  // 押している間、優先し続ける向き（盤面基準で固定）
+  const resetSteer = () => { steerRef.current = STEER_MAX; setSteer(STEER_MAX); steerHold.current = null; };
   const bars = useRef(0);
   const render = useCallback(() => setTick(t => t + 1), []);
 
@@ -945,10 +945,9 @@ export default function TankenInfinity() {
     } else {
       // 手綱が引かれていればそちらへ一歩。無ければ従来どおり効用で目標を選ぶ
       let nxt = null;
-      const pend = steerPend.current;
-      if (pend) {
-        steerPend.current = null;
-        const sx = dog.x + pend.dx, sy = dog.y + pend.dy;
+      const hold = steerHold.current;
+      if (hold) {
+        const sx = dog.x + hold.dx, sy = dog.y + hold.dy;
         if (passable(map, sx, sy) && !w.enemies.some(e => e.x === sx && e.y === sy)) nxt = { x: sx, y: sy };
       }
       if (!nxt) {
@@ -1195,11 +1194,14 @@ export default function TankenInfinity() {
     if (viewModeRef.current === next) return;
     viewModeRef.current = next; setViewMode(next); render();
   };
-  /* 手綱を引く。一人称では視線を基準に、俯瞰では盤面を基準に向きを取る。
-     壁へは踏み出せず、その場合は残り回数も減らさない。 */
-  const steerTo = (which) => {
+  /* 手綱を引く。押しはじめに一度だけ数え、離すまでその向きを優先し続ける。
+     向きは押した瞬間に盤面の向きへ固定する（一人称で視線基準のまま持ち続けると、
+     曲がるたびに基準がずれて円を描いてしまうため）。 */
+  const steerStart = (which) => {
     const w = world.current;
-    if (!startedRef.current || !w || w.dead || steerRef.current <= 0) return;
+    if (!startedRef.current || !w || w.dead) return;
+    if (steerHold.current) return;                 // 押しっぱなしの最中は数えない
+    if (steerRef.current <= 0) return;
     let d;
     if (viewModeRef.current === "fps") {
       const off = which === "up" ? 0 : which === "right" ? Math.PI / 2
@@ -1210,13 +1212,14 @@ export default function TankenInfinity() {
         : which === "left" ? [-1, 0] : [1, 0];
     }
     const nx = w.dog.x + d[0], ny = w.dog.y + d[1];
-    if (!passable(w.map, nx, ny)) return;
-    if (w.enemies.some(e => e.x === nx && e.y === ny)) return;   // 敵の居る枡へは踏み込めない
-    steerPend.current = { dx: d[0], dy: d[1] };
+    if (!passable(w.map, nx, ny)) return;          // 壁へは踏み出せない。手綱も減らさない
+    if (w.enemies.some(e => e.x === nx && e.y === ny)) return;
+    steerHold.current = { dx: d[0], dy: d[1] };
     steerRef.current -= 1; setSteer(steerRef.current);
     pushLog(`手綱を引いた（残り${steerRef.current}）`, "dev");
     render();
   };
+  const steerStop = () => { if (steerHold.current) { steerHold.current = null; render(); } };
 
   const toggleView = () => setView(viewModeRef.current === "top" ? "fps" : "top");
 
@@ -1517,10 +1520,27 @@ export default function TankenInfinity() {
       const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       const dir = { w: "up", a: "left", s: "down", d: "right",
                     ArrowUp: "up", ArrowLeft: "left", ArrowDown: "down", ArrowRight: "right" }[k];
-      if (dir) { e.preventDefault(); steerTo(dir); }
+      if (dir) { e.preventDefault(); if (!e.repeat) steerStart(dir); }
     };
+    const onKeyUp = (e) => {
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (["w", "a", "s", "d", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"].includes(k)) steerStop();
+    };
+    const onBlur = () => steerStop();
+    // 指がボタンから滑り出た・枠外で離した場合も確実に止める
+    const onPointerUp = () => steerStop();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
   }, []);
 
   useEffect(() => {
@@ -1886,7 +1906,7 @@ export default function TankenInfinity() {
                 : <button onClick={start} style={btnStyle(true)}>▶ 再開</button>}
               <button onClick={reset} style={btnStyle(false)}>新しい迷宮</button>
               <button onClick={backToTitle} style={{ ...btnStyle(false), color: "#8d7bb5", borderColor: "#4a4336" }}>◀ 初期画面</button>
-              <Dpad steer={steer} onSteer={steerTo} />
+              <Dpad steer={steer} held={!!steerHold.current} onDown={steerStart} onUp={steerStop} />
               {[["top", "▦ 俯瞰"], ["fps", "◈ 一人称"]].map(([id, label]) => (
                 <button key={id} onClick={() => setView(id)} title="Vキーでも切り替わります"
                   style={{
@@ -1963,17 +1983,20 @@ const HpBar = ({ val, max, color }) => (
 );
 
 /* 十字キー。指でも押せるよう並べ、中央に残りの手綱を出す（確認用に取り出せるようにしてある） */
-export const Dpad = ({ steer, onSteer }) => {
-  const out = steer <= 0;
+export const Dpad = ({ steer, held, onDown, onUp }) => {
+  const out = steer <= 0 && !held;
   const cell = (label, which, gc, gr) => (
-    <button onClick={() => onSteer(which)} disabled={out}
-      title={out ? "手綱を使い切った" : "この向きへ一歩（WASD・カーソルキーでも）"}
+    <button
+      onPointerDown={(e) => { e.preventDefault(); onDown(which); }}
+      onPointerUp={onUp} onPointerLeave={onUp} onPointerCancel={onUp}
+      disabled={out}
+      title={out ? "手綱を使い切った" : "押している間その向きへ（WASD・カーソルキーでも）"}
       style={{
         gridColumn: gc, gridRow: gr, width: 30, height: 26,
         background: "transparent", border: "1px solid #4a4336", borderRadius: 5,
         color: out ? "#3a352b" : "#b3a486", fontSize: 13, lineHeight: 1,
         cursor: out ? "default" : "pointer", fontFamily: "inherit", padding: 0,
-        touchAction: "manipulation",
+        touchAction: "none", userSelect: "none",
       }}>{label}</button>
   );
   return (
@@ -1982,7 +2005,7 @@ export const Dpad = ({ steer, onSteer }) => {
       {cell("←", "left", 1, 2)}
       <div style={{
         gridColumn: 2, gridRow: 2, display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 13, fontFamily: "monospace", color: out ? "#655d4c" : "#c8963e",
+        fontSize: 13, fontFamily: "monospace", color: held ? "#d9553f" : out ? "#655d4c" : "#c8963e",
       }}>{steer}</div>
       {cell("→", "right", 3, 2)}
       {cell("↓", "down", 2, 3)}

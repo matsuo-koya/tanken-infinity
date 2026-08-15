@@ -108,7 +108,7 @@ function drawBody(ctx, cw, chh, w, now, swingAt, pickAt, pickEm) {
     // 剣は素の絵文字だと切先が左下を向くので、半回転させて右上へ構える
     // [横位置, 基準の傾き, 振り出しでの追加の傾き, 左右反転, 位相, 字, 倍率, 下げ幅]
     const hands = [
-      [0.19, bareBase, -0.11, true, 0, bare, 1.0, 0.62],   // 低く構え、振りのたびに出入りする
+      [0.19, bareBase, -0.11, true, 0, bare, 1.0, 0.84],   // 覗くのは従来の半分の高さまで
       [0.88, Math.PI, 0.13, false, Math.PI, SWORD, 1.3, 0.44],   // 切先は画面外へ出てよい
     ];
     for (const [px, base, lean, mirror, phase, glyph, mag, off] of hands) {

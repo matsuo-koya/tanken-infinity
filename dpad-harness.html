@@ -8,10 +8,15 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { Dpad } from "/src/TankenInfinity.jsx";
 const log = [];
+window.__log = log;
 const App = () => React.createElement("div", {className:"row"},
-  [5,3,1,0].map(n => React.createElement("figure", {key:n, style:{margin:0}},
-    React.createElement(Dpad, { steer:n, onSteer:(w)=>{log.push(w); document.title="押: "+log.join(",");} }),
-    React.createElement("figcaption", null, `残り ${n}`)))
+  [[5,false],[3,true],[1,false],[0,false]].map(([n,h]) => React.createElement("figure", {key:n, style:{margin:0}},
+    React.createElement(Dpad, {
+      steer:n, held:h,
+      onDown:(w)=>{log.push("down:"+w); document.title=log.join(" ");},
+      onUp:()=>{log.push("up"); document.title=log.join(" ");},
+    }),
+    React.createElement("figcaption", null, `残り ${n}${h ? "・押下中" : ""}`)))
 );
 createRoot(document.getElementById("root")).render(React.createElement(App));
 setTimeout(()=>{ if(!log.length) document.title="dpad ready"; }, 300);
