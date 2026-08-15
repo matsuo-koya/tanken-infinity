@@ -44,10 +44,15 @@ export function stepCam(cam, world, dt) {
   const k = 1 - Math.pow(0.0009, dt);       // 時間刻みに依らない追従
   cam.x += (tx - cam.x) * k;
   cam.y += (ty - cam.y) * k;
+  // 向きは位置より速く合わせる。とくに敵と接している間は素早く向き直る。
+  // 振り下ろすまでに向き終えていないと、空を切っているように見える
+  const d0 = world.dog;
+  const engaged = world.enemies?.some(e => Math.abs(e.x - d0.x) + Math.abs(e.y - d0.y) === 1);
+  const ka = 1 - Math.pow(engaged ? 1e-9 : 3e-5, dt);
   let d = (world.dog.head || 0) - cam.ang;
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
-  cam.ang += d * k;
+  cam.ang += d * ka;
 }
 
 /* 視点の主の身体。世界ではなく画面に貼るので、遠近には従わせない。

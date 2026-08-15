@@ -26,12 +26,18 @@ const cache = {};
 // 打撃の合図を now より前に置き、振りの各段階を切り出す
 const SW = (ms) => ({ combat:true, __sw: ms });
 const hp = (v) => ({ dog:{x:8,y:7,head:0,em:"🚶",kj:"人",name:"人",hp:v,maxHp:30} });
+// 背後の敵へ振り向きながら斬る場面。打撃時点で残り27度の想定
+const foe = (dx,dy,ang) => ({
+  dog:{x:8,y:7,head:Math.atan2(dy,dx),em:"🚶",kj:"人",name:"人",hp:30,maxHp:30},
+  enemies:[{k:"鼠",e:"🐀",x:8+dx,y:7+dy,alerted:true,id:0}],
+  combat:true, __ang:ang,
+});
+const R = Math.PI/180;
 const shots = [
-  ["健全 30/30",  mk(8,7,0,hp(30)), 462, null, null],
-  ["11/30（危険域の手前）", mk(8,7,0,hp(11)), 462, null, null],
-  ["7/30",        mk(8,7,0,hp(7)),  462, null, null],
-  ["4/30",        mk(8,7,0,hp(4)),  462, null, null],
-  ["1/30（瀕死）", mk(8,7,0,hp(1)),  462, null, null],
+  ["振り向き前（真後ろの敵は見えない）", mk(8,7,0,foe(-1,0,0)), 1386, null],
+  ["残り70度（従来の速さ）", mk(8,7,0,foe(-1,0,Math.PI-70*R)), 1386, 91],
+  ["残り27度（接敵時の速さ）", mk(8,7,0,foe(-1,0,Math.PI-27*R)), 1386, 91],
+  ["向き終えた",            mk(8,7,0,foe(-1,0,Math.PI)), 1386, 91],
 ];
 const root = document.getElementById("root");
 for (const [label, world, nw, swAgo, pkAgo] of shots) {
@@ -39,7 +45,7 @@ for (const [label, world, nw, swAgo, pkAgo] of shots) {
   const cv = document.createElement("canvas");
   const CW = 360, CH = 260;
   cv.width = CW; cv.height = CH; cv.style.width = CW+"px"; cv.style.height = CH+"px";
-  const cam = { x: world.dog.x+0.5, y: world.dog.y+0.5, ang: world.dog.head, of: world };
+  const cam = { x: world.dog.x+0.5, y: world.dog.y+0.5, ang: world.__ang ?? world.dog.head, of: world };
   drawFPS(cv.getContext("2d"), CW, CH, { world, cam, cache, W, H, ITEM_TYPES, now: nw ?? 1000, swingAt: swAgo == null ? 0 : (nw ?? 1000) - swAgo, pickAt: pkAgo == null ? 0 : (nw ?? 1000) - pkAgo, pickEm: "🧪" });
   const cap = document.createElement("figcaption"); cap.textContent = label;
   fig.appendChild(cv); fig.appendChild(cap); root.appendChild(fig);

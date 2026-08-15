@@ -912,6 +912,10 @@ export default function TankenInfinity() {
     const adj = w.enemies.find(e => Math.abs(e.x - dog.x) + Math.abs(e.y - dog.y) === 1);
     if (adj) {
       adj.alerted = true;
+      // 殴りかかる相手へ向き直る。背後や横から絡まれたとき、一人称で
+      // 誰もいない方へ剣を振ってしまうのを防ぐ
+      dog.head = Math.atan2(adj.y - dog.y, adj.x - dog.x);
+      if (adj.x !== dog.x) dog.facing = adj.x > dog.x ? 1 : -1;
       const dmg = dog.atk + Math.floor(w.depth / 3);
       adj.hp -= dmg;
       sfx("hit", time);
