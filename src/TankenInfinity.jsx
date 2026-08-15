@@ -40,6 +40,10 @@ const PROG = { bach: [0, 5, 3, 4], edm: [5, 3, 0, 4] };
 const isBaroque = s => s === "bach" || s === "organ";
 
 // ゲーム1ティックあたりの16分音符の数。戦闘中は実時間でおよそ2.2〜2.7倍に伸びる
+const STEER_MAX = 5;        // 一つの命につき手綱を引ける回数
+const CARD = [[1, 0], [0, 1], [-1, 0], [0, -1]];   // 東・南・西・北
+const snapDir = (ang) => CARD[((Math.round(ang / (Math.PI / 2)) % 4) + 4) % 4];
+
 const TICK_DIV_WALK = 2;
 const TICK_DIV_FIGHT = 6;
 
@@ -439,6 +443,10 @@ export default function TankenInfinity() {
   const beatFlip = useRef(false);
   const stepIdx = useRef(0);
   const tickAcc = useRef(0);   // ゲーム進行の間引き用（音楽の刻みとは別に数える）
+  const [steer, setSteer] = useState(STEER_MAX);   // 手綱の残り
+  const steerRef = useRef(STEER_MAX);
+  const steerPend = useRef(null);                  // 次の一歩に割り込む向き
+  const resetSteer = () => { steerRef.current = STEER_MAX; setSteer(STEER_MAX); steerPend.current = null; };
   const bars = useRef(0);
   const render = useCallback(() => setTick(t => t + 1), []);
 
@@ -891,6 +899,7 @@ export default function TankenInfinity() {
       w.deadTimer++;
       if (w.deadTimer > (isBaroque(music.current.style) ? 64 : 20)) {
         resolvePartyNow();
+        resetSteer();   // 新しい命には新しい手綱
         // おまかせ：新しい命とともに楽風も変わる（requiemの長さは旧楽風で判定済み）
         if (partySelRef.current === "random") reshuffleStyle();
         newWorld(1, false);
@@ -934,11 +943,22 @@ export default function TankenInfinity() {
         core.current.E = Math.min(1, core.current.E + 0.15);
       } else pushLog(`${dog.name}は${adj.k}に${dog.verb}`, "fight");
     } else {
-      // 目標選定（効用ベース）
-      const target = chooseTarget(w);
-      if (target) {
-        const blocked = new Set(w.enemies.map(e => e.y * W + e.x));
-        const nxt = bfsStep(map, dog, target, blocked);
+      // 手綱が引かれていればそちらへ一歩。無ければ従来どおり効用で目標を選ぶ
+      let nxt = null;
+      const pend = steerPend.current;
+      if (pend) {
+        steerPend.current = null;
+        const sx = dog.x + pend.dx, sy = dog.y + pend.dy;
+        if (passable(map, sx, sy) && !w.enemies.some(e => e.x === sx && e.y === sy)) nxt = { x: sx, y: sy };
+      }
+      if (!nxt) {
+        const target = chooseTarget(w);
+        if (target) {
+          const blocked = new Set(w.enemies.map(e => e.y * W + e.x));
+          nxt = bfsStep(map, dog, target, blocked);
+        }
+      }
+      {
         if (nxt) {
           const prevPos = { x: dog.x, y: dog.y };
           if (nxt.x !== dog.x) dog.facing = nxt.x > dog.x ? 1 : -1;
@@ -1175,6 +1195,29 @@ export default function TankenInfinity() {
     if (viewModeRef.current === next) return;
     viewModeRef.current = next; setViewMode(next); render();
   };
+  /* 手綱を引く。一人称では視線を基準に、俯瞰では盤面を基準に向きを取る。
+     壁へは踏み出せず、その場合は残り回数も減らさない。 */
+  const steerTo = (which) => {
+    const w = world.current;
+    if (!startedRef.current || !w || w.dead || steerRef.current <= 0) return;
+    let d;
+    if (viewModeRef.current === "fps") {
+      const off = which === "up" ? 0 : which === "right" ? Math.PI / 2
+                : which === "down" ? Math.PI : -Math.PI / 2;
+      d = snapDir(cam.current.ang + off);
+    } else {
+      d = which === "up" ? [0, -1] : which === "down" ? [0, 1]
+        : which === "left" ? [-1, 0] : [1, 0];
+    }
+    const nx = w.dog.x + d[0], ny = w.dog.y + d[1];
+    if (!passable(w.map, nx, ny)) return;
+    if (w.enemies.some(e => e.x === nx && e.y === ny)) return;   // 敵の居る枡へは踏み込めない
+    steerPend.current = { dx: d[0], dy: d[1] };
+    steerRef.current -= 1; setSteer(steerRef.current);
+    pushLog(`手綱を引いた（残り${steerRef.current}）`, "dev");
+    render();
+  };
+
   const toggleView = () => setView(viewModeRef.current === "top" ? "fps" : "top");
 
   // 描画本体はfpsView.jsに置いた（確認用ハーネスと同じものを呼ぶため）
@@ -1439,7 +1482,7 @@ export default function TankenInfinity() {
     if (next) unlockSpeech();   // このタップも解錠の好機（切→入で初めて語らせる場合）
     else { try { window.speechSynthesis?.cancel(); } catch (e) {} }
   };
-  const reset = () => { prioHold.current = 0; resolvePartyNow(); newWorld(1, false); core.current = { F: 0.1, E: 0.5, A: 0.5, lastOp: "—", opFlash: 0 }; bars.current = 0; rebirth.current = 0; variant.current.coda = pickOther(CODA_TEXTS.length, variant.current.coda); render(); };
+  const reset = () => { prioHold.current = 0; resetSteer(); resolvePartyNow(); newWorld(1, false); core.current = { F: 0.1, E: 0.5, A: 0.5, lastOp: "—", opFlash: 0 }; bars.current = 0; rebirth.current = 0; variant.current.coda = pickOther(CODA_TEXTS.length, variant.current.coda); render(); };
 
   /* 初期画面へ戻る：機関を止めて記録を白紙に返す（音響機関は解錠済みのまま温存） */
   const backToTitle = () => {
@@ -1455,6 +1498,7 @@ export default function TankenInfinity() {
     narr.current = { text: "", at: 0 };
     ascends.current = []; bigAscend.current = null;
     bars.current = 0; rebirth.current = 0; combatLvl.current = 0; prioHold.current = 0;
+    resetSteer();
     // 戻ってきた初期画面では別の言い回しで迎える
     variant.current = {
       blurb: pickOther(TITLE_BLURBS.length, variant.current.blurb),
@@ -1469,7 +1513,11 @@ export default function TankenInfinity() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = e.target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
-      if (e.key === "v" || e.key === "V") { e.preventDefault(); toggleView(); }
+      if (e.key === "v" || e.key === "V") { e.preventDefault(); toggleView(); return; }
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      const dir = { w: "up", a: "left", s: "down", d: "right",
+                    ArrowUp: "up", ArrowLeft: "left", ArrowDown: "down", ArrowRight: "right" }[k];
+      if (dir) { e.preventDefault(); steerTo(dir); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1838,6 +1886,7 @@ export default function TankenInfinity() {
                 : <button onClick={start} style={btnStyle(true)}>▶ 再開</button>}
               <button onClick={reset} style={btnStyle(false)}>新しい迷宮</button>
               <button onClick={backToTitle} style={{ ...btnStyle(false), color: "#8d7bb5", borderColor: "#4a4336" }}>◀ 初期画面</button>
+              <Dpad steer={steer} onSteer={steerTo} />
               {[["top", "▦ 俯瞰"], ["fps", "◈ 一人称"]].map(([id, label]) => (
                 <button key={id} onClick={() => setView(id)} title="Vキーでも切り替わります"
                   style={{
@@ -1912,6 +1961,34 @@ const HpBar = ({ val, max, color }) => (
     <div style={{ height: "100%", width: `${Math.max(0, (val / max) * 100)}%`, background: color, transition: "width 160ms" }} />
   </div>
 );
+
+/* 十字キー。指でも押せるよう並べ、中央に残りの手綱を出す（確認用に取り出せるようにしてある） */
+export const Dpad = ({ steer, onSteer }) => {
+  const out = steer <= 0;
+  const cell = (label, which, gc, gr) => (
+    <button onClick={() => onSteer(which)} disabled={out}
+      title={out ? "手綱を使い切った" : "この向きへ一歩（WASD・カーソルキーでも）"}
+      style={{
+        gridColumn: gc, gridRow: gr, width: 30, height: 26,
+        background: "transparent", border: "1px solid #4a4336", borderRadius: 5,
+        color: out ? "#3a352b" : "#b3a486", fontSize: 13, lineHeight: 1,
+        cursor: out ? "default" : "pointer", fontFamily: "inherit", padding: 0,
+        touchAction: "manipulation",
+      }}>{label}</button>
+  );
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 30px)", gridTemplateRows: "repeat(3, 26px)", gap: 3 }}>
+      {cell("↑", "up", 2, 1)}
+      {cell("←", "left", 1, 2)}
+      <div style={{
+        gridColumn: 2, gridRow: 2, display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 13, fontFamily: "monospace", color: out ? "#655d4c" : "#c8963e",
+      }}>{steer}</div>
+      {cell("→", "right", 3, 2)}
+      {cell("↓", "down", 2, 3)}
+    </div>
+  );
+};
 
 const btnStyle = (primary) => ({
   background: primary ? "#8d7bb5" : "transparent",
